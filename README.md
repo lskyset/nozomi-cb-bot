@@ -6,7 +6,7 @@ A discord bot made to help managing clan battles in Princess Connect! Re: Dive.
 
 1. After cloning the repository use pip to install the required packages.
 ```bash
-pip install -r requirement.txt
+pip install -r requirements.txt
 ```
 
 2. Create a `discord_token.txt` file containing your bot's Discord API token.
