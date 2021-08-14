@@ -14,7 +14,7 @@ pip install -r requirements.txt
 3. Create a `clans_config.json` file containing the clan battle settings.
 You can also overwrite the default settings in this file or in `config.py`.
 
-	'clans_config.json' example:
+	`clans_config.json` example:
 ```json
 {
 	"test": {
