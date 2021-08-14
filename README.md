@@ -9,11 +9,12 @@ A discord bot made to help managing clan battles in Princess Connect! Re: Dive.
 pip install -r requirement.txt
 ```
 
-1. Create a `discord_token.txt` file containing your bot's Discord API token.
+2. Create a `discord_token.txt` file containing your bot's Discord API token.
 
-1. Create a `clans_config.json` file containing the clan battle settings.
+3. Create a `clans_config.json` file containing the clan battle settings.
 You can also overwrite the default settings in this file or in `config.py`.
-Example:
+
+	Example:
 ```json
 {
 	"test": {
