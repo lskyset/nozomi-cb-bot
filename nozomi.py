@@ -10,7 +10,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
 import db
 import config as cfg
-from config import PREFIXE as P
+from config import PREFIX as P
 import emoji as e
 from ui import Ui
 
