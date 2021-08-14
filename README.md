@@ -26,3 +26,5 @@ You can also overwrite the default settings in this file or in `config.py`.
 	}
 }
 ```
+
+4. Run `nozomi.py`
