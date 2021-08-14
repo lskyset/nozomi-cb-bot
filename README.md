@@ -20,9 +20,9 @@ You can also overwrite the default settings in this file or in `config.py`.
 	"test": {
 		"ENV": 1,
 		"GUILD_ID": 796792048882548756,
-        "CHANNEL_ID": 798368120913788969,
-        "CLAN_ROLE_ID": 797601335839031337,
-        "CLAN_MOD_ROLE_ID": 797601335839031337
+        	"CHANNEL_ID": 798368120913788969,
+        	"CLAN_ROLE_ID": 797601335839031337,
+        	"CLAN_MOD_ROLE_ID": 797601335839031337
 	}
 }
 ```
