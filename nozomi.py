@@ -23,9 +23,6 @@ intents.members = True
 bot = commands.Bot(command_prefix=P, description="List of commands : (Under construction)", intents=intents, case_insensitive=True)
 bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category='Other')
 
-# async def on_member_join(self, member):
-#     await member.add_roles(member.guild.get_role(798373063116193802),member.guild.get_role(797601335839031337))
-
 
 def find_clan(message):
     for clan in clans:
@@ -414,23 +411,23 @@ def daily_reset(name):
         clan.is_daily_reset = True
 
 
-def bot_export(message):
-    file = False
-    file2 = False
-    if (message.author.id in cfg.MODS):
-        m_split = message.content.split()
-        if len(m_split) > 1:
-            if os.path.isfile(m_split[1] + '.db'):
-                file = db.data_csv(m_split[1])
-                file2 = db.chat_log_csv(m_split[1])
-                msg = f'{file} and {file2} have been sent to your DM! {message.author.mention}'
-            else:
-                msg = f"{m_split[1]}.db doesn't exist"
-        else:
-            msg = f'Argument not found.\nUse "{P}export <cb_file_name>" to export your clan battle file. (mod only)'
-    else:
-        msg = f'You dont have permission to use this command {message.author.mention}'
-    return (msg, file, file2)
+# def bot_export(message):
+#     file = False
+#     file2 = False
+#     if (message.author.id in cfg.MODS):
+#         m_split = message.content.split()
+#         if len(m_split) > 1:
+#             if os.path.isfile(m_split[1] + '.db'):
+#                 file = db.data_csv(m_split[1])
+#                 file2 = db.chat_log_csv(m_split[1])
+#                 msg = f'{file} and {file2} have been sent to your DM! {message.author.mention}'
+#             else:
+#                 msg = f"{m_split[1]}.db doesn't exist"
+#         else:
+#             msg = f'Argument not found.\nUse "{P}export <cb_file_name>" to export your clan battle file. (mod only)'
+#     else:
+#         msg = f'You dont have permission to use this command {message.author.mention}'
+#     return (msg, file, file2)
 
 
 try:
