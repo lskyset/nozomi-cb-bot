@@ -45,7 +45,7 @@ You can also overwrite the default settings in this file or in `config.py`.
 
 ## Usage
 
-Commands are not case sensitive but the args are.
+Commands are not case sensitive but the arguments are.
 
 ### List of commands: (examples with B1)
 * `!q b1` : Add yourself to B1's queue.
