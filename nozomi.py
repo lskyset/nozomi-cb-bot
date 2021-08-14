@@ -372,7 +372,7 @@ async def cb_init(channel, db_name, clan_config):
     msg = None
     if db_name:
         if cfg.ENV > 0:
-            db_name += '_debug'
+            db_name += '_dev'
         jobstores = {'default': SQLAlchemyJobStore(url='sqlite:///{}.db'.format(db_name))}
         job_defaults = {'coalesce': True, 'misfire_grace_time': None}
         scheduler = AsyncIOScheduler()
