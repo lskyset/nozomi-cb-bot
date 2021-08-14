@@ -36,7 +36,7 @@ class Clan():
             self.gs_sheet = gc.open_by_key(self.google_drive_sheet['SHEET_KEY'])
             self.gs_db = self.gs_sheet.worksheet(self.google_drive_sheet['DATA_WORKSHEET_NAME'])
             self.gs_chat_log = self.gs_sheet.worksheet(self.google_drive_sheet['CHAT_LOG_WORKSHEET_NAME'])
-            self.drive_loading = False
+        self.drive_loading = False
         self.members = []
         self.mods = []
         self.day = math.ceil((cfg.jst_time() - cfg.cb_start_date).total_seconds() / 60 / 60 / 24)
@@ -77,13 +77,13 @@ class Clan():
         self.update()
 
     def drive_update(self):
+        while self.drive_loading:
+            time.sleep(1)
+        self.drive_loading = True
+        self.full_update()
         if not cfg.DISABLE_DRIVE:
-            while self.drive_loading:
-                time.sleep(1)
-            self.drive_loading = True
-            self.full_update()
             update_db(self)
-            self.drive_loading = False
+        self.drive_loading = False
 
     async def hitting(self, member_id: int, message, *args):
         member = self.find_member(member_id)
