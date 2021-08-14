@@ -400,7 +400,6 @@ async def cb_init(channel, db_name, clan_config):
         scheduler.start()
         print(msg)
         scheduler.print_jobs()
-        print('\n')
         await channel.send(msg, delete_after=5)
         clan.ui = Ui()
         await clan.ui.start(channel, clan)
