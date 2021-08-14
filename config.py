@@ -10,7 +10,7 @@ if os.path.isfile(discord_token_file_name):
 else:
     print(f'Error: {discord_token_file_name} not found')
     exit()
-PREFIXE = "!"
+PREFIX = "!"
 ENV = 1
 DISABLE_DRIVE = True
 
