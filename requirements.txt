@@ -1,0 +1,7 @@
+discord.py-message-components==1.7.5
+pytz
+apscheduler
+SQLAlchemy
+gspread
+PyDrive
+oauth2client
