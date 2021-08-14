@@ -53,7 +53,7 @@ Commands are not case sensitive but the args are.
 * `!h b1` : Claim a hit on B1 (Means you're going to hit now)
 * `!s b1 @member` : Claim a B1 hit with someone else. (sync)
 * `!c` : Cancel a claimed hit.
-* `!d 1m` : Register 1 million damages to the boss you claimed. (Do not use commas like 10,000,000, only numbers like 1000000)
+* `!d 1m` : Register 1 million damages to the boss you claimed.
 * `!dead` : Kill the boss you claimed (register damages equal to the boss' remaining health).
 * `!of` : Gives you the OF status
 * `!rmof` : Removes your OF status
