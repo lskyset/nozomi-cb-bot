@@ -15,7 +15,7 @@ from pydrive.auth import GoogleAuth
 
 import config as cfg
 import emoji as e
-from config import PREFIXE as P
+from config import PREFIX as P
 
 if not cfg.DISABLE_DRIVE:
     scope = ['https://spreadsheets.google.com/feeds',
