@@ -189,32 +189,6 @@ class Clan():
         else:
             await message.channel.send(f'You must claim a hit before registering damages {message.author.mention}\nFor example use `{P}h b1` to claim a hit on b1.', delete_after=7)
 
-    # def revive_boss(self, hp):
-    #     self.boss_num -= 1
-    #     self.current_boss_num = 1 + (self.boss_num - 1) % 5
-    #     self.current_boss = self.bosses[self.current_boss_num - 1]
-    #     self.current_wave = 1 + (self.boss_num - 1) // 5
-    #     self.current_tier = 1 + cfg.tier_threshold.index(max([i for i in cfg.tier_threshold if self.current_wave >= i]))
-    #     self.current_boss.hp = min(1000000 * self.current_boss.max_hp[self.current_tier - 1], hp)
-    #     self.undo_hit(revive=True)
-
-    # def undo_hit(self, revive=False):
-    #     user = self.last_damage_done['member']
-    #     day = self.last_damage_done['day']
-    #     dmg = self.last_damage_done['amount']
-    #     overflow = self.last_damage_done['of']
-    #     user.dmg[day - 1] -= dmg
-    #     self.dmg[day - 1] -= dmg
-    #     if not revive:
-    #         self.current_boss.hp += dmg
-    #     if not overflow:
-    #         user.remaining_hits += 1
-    #         user.total_hits -= 1
-    #     else:
-    #         user.of_status = True
-    #     user.update()
-    #     self.update()
-
     async def queue(self, member_id: int, message, *args):
         member = self.find_member(member_id)
         boss = self.find_boss(message.id)
@@ -274,8 +248,69 @@ class Clan():
 
     def add_damage_log(self, boss, member, damage: int, overflow=False, dead=False):
         c = self.conn.cursor()
-        data = (boss.number, boss.wave - 1 * dead, member.discord_id, member.name, damage, overflow, dead)
+        data = (boss.number, boss.wave - 1 * dead, member.discord_id, member.name, damage, overflow, dead, int(cfg.jst_time().timestamp()))
         c.execute(f'INSERT INTO damage_log VALUES {data}')
+
+    # def revive_boss(self, hp):
+    #     self.boss_num -= 1
+    #     self.current_boss_num = 1 + (self.boss_num - 1) % 5
+    #     self.current_boss = self.bosses[self.current_boss_num - 1]
+    #     self.current_wave = 1 + (self.boss_num - 1) // 5
+    #     self.current_tier = 1 + cfg.tier_threshold.index(max([i for i in cfg.tier_threshold if self.current_wave >= i]))
+    #     self.current_boss.hp = min(1000000 * self.current_boss.max_hp[self.current_tier - 1], hp)
+    #     self.undo_hit(revive=True)
+
+    def find_last_damage_log(self, member_id: int):
+        c = self.conn.cursor()
+        logs = c.execute(f'SELECT * from damage_log WHERE member_id = {member_id} ORDER BY timestamp').fetchall()
+        if not logs:
+            return False
+        data = logs[-1]
+        hit = {}
+        columns = c.execute("PRAGMA table_info(damage_log)").fetchall()
+        for column in columns:
+            if data[column[0]] is not None:
+                hit[column[1]] = data[column[0]]
+        return hit
+
+    def undo(self, message):
+        member = self.find_member(message.author.id)
+        hit = self.find_last_damage_log(member.discord_id)
+        boss = self.find_boss(hit['boss_number'])
+        if not hit:
+            return False
+
+        boss_hits = boss.get_damage_log()
+        p_boss_hits = boss.get_damage_log(wave_offset=-1)
+
+        if boss_hits:
+            if hit == boss_hits[-1]:
+                c = self.conn.cursor()
+                c.execute(f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}')
+                self.conn.commit()
+                boss.hp += hit['damage']
+                member.remaining_hits += (hit['overflow'] + 1) % 2
+                member.of_number += hit['overflow']
+                member.of_status = bool(hit['overflow'])
+                member.update()
+                boss.update()
+                return boss
+        elif p_boss_hits:
+            if hit == p_boss_hits[-1]:
+                c = self.conn.cursor()
+                c.execute(f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}')
+                self.conn.commit()
+                boss.hp = hit['damage']
+                boss.wave -= 1
+                member.remaining_hits += (hit['overflow'] + 1) % 2
+                member.of_number += hit['overflow']
+                setattr(member, f'b{boss.number}_hits', getattr(member, f'b{boss.number}_hits') - 1)
+                member.total_hits -= 1
+                member.update()
+                boss.update()
+                return boss
+        message.respond(f"You can only undo your last hit if it's the most recent hit on a boss {message.author.mention}")
+        return False
 
     def daily_reset(self):
         # self.rush_hour = False
@@ -387,7 +422,7 @@ class Boss():
 
     def get_damage_log(self, wave_offset=0):
         c = self.conn.cursor()
-        data = c.execute(f'SELECT * from damage_log WHERE boss_number = {self.number} AND boss_wave = {self.wave + wave_offset}').fetchall()
+        data = c.execute(f'SELECT * from damage_log WHERE boss_number = {self.number} AND boss_wave = {self.wave + wave_offset} ORDER BY timestamp').fetchall()
         if not data:
             return None
         hits = []
@@ -482,7 +517,8 @@ def create_cb_db(name, guild_id, channel_id):
                 member_name text,
                 damage int,
                 overflow bool,
-                dead bool)''')
+                dead bool,
+                timestamp int)''')
 
     c.execute('''CREATE TABLE queue
                 (boss_number int,

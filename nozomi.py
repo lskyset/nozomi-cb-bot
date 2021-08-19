@@ -53,8 +53,7 @@ async def on_button_click(i: discord.Interaction, b: discord.ButtonClick):
 async def on_message(message):
     clan = find_clan(message)
     if clan:
-        if clan:
-            clan.log(message)
+        clan.log(message)
         if message.author.bot:
             return
         await message.delete(delay=3)
@@ -235,36 +234,15 @@ class Cb_commands(commands.Cog, name='CB Commands'):
         await self.done(ctx, *args)
         bot.get_command('dead').reset_cooldown(ctx)
 
-    # @commands.command()
-    # async def undo(self, ctx):
-    #     """ """
-    #     ldd = db.clan.last_damage_done
-    #     if not ldd:
-    #         return await ctx.send(f"Last damage dealt not found {ctx.author.mention}", delete_after=5)
-    #     if ldd['member'].discord_id != ctx.author.id:
-    #         return await ctx.send(f"You can't undo someone else's damage {ctx.author.mention}", delete_after=5)
-    #     await ctx.message.add_reaction(e.ok)
-    #     global bot_loading
-    #     bot_loading = True
-    #     try:
-    #         clan = find_clan(ctx.message)
-    #         if db.clan.current_boss_num != ldd['boss_num']:
-    #             box_message = box.msg
-    #             await box.close()
-    #             await box_message.delete()
-    #             db.clan.revive_boss(ldd['amount'])
-    #             box_msg = await ctx.send(f'**{ctx.author.display_name}** Revived B{db.clan.current_boss_num} with undo')
-    #             box = Box(box_msg)
-    #             await box.create()
-    #         else:
-    #             db.clan.undo_hit()
-    #             db.clan.last_damage_done = None
-    #             db.update_db(db.db_name)
-    #             box.damage_list = box.damage_list[:box.damage_list.rfind('\n')]
-    #             await box.update()
-    #         bot_loading = False
-    #     except:
-    #         bot_loading = False
+    @commands.command()
+    async def undo(self, ctx):
+        """ """
+        clan = find_clan(ctx.message)
+        if clan:
+            boss = clan.undo(ctx.message)
+            if boss:
+                await ctx.message.add_reaction(e.ok)
+            await clan.ui.update(boss.message_id)
 
     @tasks.loop(seconds=20)
     async def ui_update_loop(self):
@@ -277,7 +255,8 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                     guild = bot.get_guild(clan.guild_id)
                     channel = guild.get_channel(clan.channel_id)
                     message = channel.get_partial_message(boss.message_id)
-                    clan.check_queue(message)
+                    if clan.timeout_minutes > 0:
+                        clan.check_queue(message)
                     await clan.ui.update(boss.message_id)
 
 

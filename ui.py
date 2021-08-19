@@ -136,7 +136,7 @@ class Boss_box():
             for member_data in queue:
                 member = self.clan.find_member(member_data['member_id'])
                 time_left = ''
-                if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id():
+                if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
                     time_left += time.strftime(' [%M:%S]', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
                 queue_text += f"-{member.name}{' (OF)' * member.of_status}{time_left} \n"
             queue_text += '\n'
