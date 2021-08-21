@@ -108,7 +108,7 @@ class Boss_box():
 
     def set_description(self):
         # title
-        hp_text = "HP : *{:,} / {:,}* \n\n".format(self.boss.hp, self.boss.max_hp[self.boss.tier - 1] * 10 ** 6)
+        hp_text = "HP : *{:,} / {:,}* \n\n".format(self.boss.hp, self.boss.max_hp[self.boss.tier - 1])
 
         # previous damage log
         p_damage_log = self.boss.get_damage_log(wave_offset=-1)
@@ -137,8 +137,9 @@ class Boss_box():
                 member = self.clan.find_member(member_data['member_id'])
                 time_left = ''
                 if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
-                    time_left += time.strftime(' [%M:%S]', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
-                queue_text += f"-{member.name}{' (OF)' * member.of_status}{time_left} \n"
+                    time_left += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
+                note_text = f": {member_data['note']}" * bool(member_data['note'])
+                queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
             queue_text += '\n'
 
         description_text = f'{hp_text}{p_damage_text}{damage_text}{queue_text}'
@@ -154,7 +155,7 @@ class Boss_box():
             if sm_id:
                 if not self.discord_sm or self.discord_sm.id != sm_id:
                     self.discord_sm = await self.message.guild.fetch_member(sm_id)
-                self.embed.set_footer(text=f'{self.discord_hm.display_name} is curently hitting {clan_hm.remaining_hits}/3{" (OF)" * clan_hm.of_status} with {self.discord_sm.display_name}', icon_url=self.discord_hm.avatar_url)
+                self.embed.set_footer(text=f'{self.discord_hm.display_name} is curently hitting {clan_hm.remaining_hits}/3{" (OF)" * clan_hm.of_status} with {self.discord_sm.display_name}' * 30, icon_url=self.discord_hm.avatar_url)
             else:
                 self.embed.set_footer(text=f'{self.discord_hm.display_name} is curently hitting {clan_hm.remaining_hits}/3{" (OF)" * clan_hm.of_status}', icon_url=self.discord_hm.avatar_url)
         else:
@@ -199,7 +200,7 @@ class Overview_box():
             wave_offset = boss.wave - self.clan.current_wave
             self.embed.add_field(
                 name=f'Boss {boss.number} : {boss.name}',
-                value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n" + f"**HP :** *{boss.hp  // 10 ** 6}M / {boss.max_hp[boss.tier - 1]}M*\n",
+                value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n" + f"**HP :** *{boss.hp  // 10 ** 6}M / {boss.max_hp[boss.tier - 1] // 10 ** 6}M*\n",
             )
         hits_left = 0
         for member in self.clan.members:

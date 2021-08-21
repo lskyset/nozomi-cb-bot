@@ -62,8 +62,10 @@ async def on_message(message):
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
+    if isinstance(error, commands.CommandNotFound) or isinstance(error, commands.errors.InvalidEndOfQuotedStringError):
         await ctx.message.add_reaction(e.cross)
+    elif cfg.ENV > 0:
+        raise error
 
 
 class Global_commands(commands.Cog, name='Global Commands'):
@@ -119,6 +121,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     @commands.command(aliases=('q', 'que'))
     async def queue(self, ctx, *args, from_button=False):
         """ """
+        args = tuple(map(str.lower, args))
         clan = find_clan(ctx.message)
         if clan:
             boss_message = None
@@ -130,6 +133,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                         boss_message = await ctx.channel.fetch_message(boss.message_id)
                         boss_message.author = ctx.author
                         break
+
             if boss_message:
                 await clan.queue(ctx.author.id, boss_message, *args)
                 await clan.ui.update(boss_message.id)
@@ -142,6 +146,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     @commands.command(aliases=('dq', 'dque'))
     async def dequeue(self, ctx, *args):
         """ """
+        args = tuple(map(str.lower, args))
         clan = find_clan(ctx.message)
         if clan:
             boss_message = None
@@ -159,6 +164,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     @commands.command(aliases=('h', 'hitting'))
     async def hit(self, ctx, *args, from_button=False):
         """ """
+        args = tuple(map(str.lower, args))
         clan = find_clan(ctx.message)
         if clan:
             boss_message = None
@@ -182,6 +188,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     @commands.command(aliases=('s', 'syncing'))
     async def sync(self, ctx, *args):
         """ """
+        args = tuple(map(str.lower, args))
         if ctx.message.mentions:
             sync_member = ctx.message.mentions[0]
             if sync_member == ctx.author:
@@ -220,6 +227,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.member)
     async def done(self, ctx, *args):
         """ """
+        args = tuple(map(str.lower, args))
         clan = find_clan(ctx.message)
         if clan:
             boss_message_id = await clan.done(ctx.message.author.id, ctx.message, *args)
@@ -291,6 +299,7 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
     @commands.command(aliases=('fdq',))
     async def force_dequeue(self, ctx, *args):
         """ """
+        args = tuple(map(str.lower, args))
         if ctx.message.mentions:
             member = ctx.message.mentions[0]
             clan = find_clan(ctx.message)
@@ -358,7 +367,7 @@ async def cb_init(channel, db_name, clan_config):
         scheduler.configure(jobstores=jobstores, job_defaults=job_defaults, timezone=pytz.timezone('Japan'))
         path = f'{db_name}.db'
         if os.path.isfile(path) or (not cfg.DISABLE_DRIVE and db.download_db(path)):
-            msg = f'{db_name} has been loaded.'
+            msg = f'{db_name}.db has been loaded.'
             clan = db.Clan(db_name, clan_config)
             clans.append(clan)
         else:
@@ -368,7 +377,7 @@ async def cb_init(channel, db_name, clan_config):
             for member in channel.guild.get_role(clan_config['CLAN_ROLE_ID']).members:
                 clan.add_member(member)
             scheduler.add_job(daily_reset, 'interval', args=[db_name], days=1, start_date=datetime.datetime(2021, 1, 10, 5, 0, 0))
-            msg = '{} has been created.'.format(db_name)
+            msg = f'{db_name}.db has been created and loaded.'
             clan.drive_update()
 
         mods_members = channel.guild.get_role(clan_config['CLAN_MOD_ROLE_ID']).members
@@ -377,8 +386,7 @@ async def cb_init(channel, db_name, clan_config):
                 clan.mods.append(member.id)
         clan.is_daily_reset = False
         scheduler.start()
-        print(msg)
-        scheduler.print_jobs()
+        print(f'{msg[:-1]} in "{channel.guild.name}" #{channel.name}.')
         await channel.send(msg, delete_after=5)
         clan.ui = Ui()
         await clan.ui.start(channel, clan)

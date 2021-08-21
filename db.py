@@ -44,13 +44,13 @@ class Clan():
 
         self.conn = sqlite3.connect(db_name + '.db')
         c = self.conn.cursor()
-        data = c.execute('select * from cb_data').fetchone()
+        data = c.execute('SELECT * from cb_data').fetchone()
         if data:
             columns = c.execute("PRAGMA table_info(cb_data)").fetchall()
             for column in columns:
                 if data[column[0]] is not None:
                     setattr(self, column[1], data[column[0]])
-            for (member_id,) in c.execute("select discord_id from members_data").fetchall():
+            for (member_id,) in c.execute("SELECT discord_id from members_data").fetchall():
                 self.members.append(Member(member_id, self.conn))
         for boss_data in cfg.boss_data:
             boss = Boss(boss_data, self)
@@ -64,7 +64,7 @@ class Clan():
         c = self.conn.cursor()
         for key, val in self.__dict__.items():
             try:
-                c.execute(f'UPDATE cb_data SET {key} = {val}')
+                c.execute(f'UPDATE cb_data SET {key} = ?', (val,))
             except sqlite3.OperationalError:
                 pass
         self.conn.commit()
@@ -167,7 +167,9 @@ class Clan():
         boss = self.find_boss(member.hitting_boss_number)
         if member and boss:
             if args:
-                dmg = re.match(r"^([0-9]+\.?[0-9]*([mk])?)", args[0].lower().replace(',', '.'))
+                dmg = re.match(r"^([0-9]+\.?[0-9]*([mk])?)", args[0].replace(',', '.'))
+                if dmg is None:
+                    return False
                 dmg = min(replace_num(dmg.group(0)), boss.hp)
                 if dmg:
                     await message.add_reaction(e.ok)
@@ -196,17 +198,27 @@ class Clan():
             return
         if member.hitting_boss_number == boss.number:
             return await message.channel.send(f"You can't queue a boss you are hitting {message.author.mention}", delete_after=7)
+
         c = self.conn.cursor()
         already_in_queue = c.execute(f'SELECT * from queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}').fetchone()
         if already_in_queue:
             return await message.channel.send(f"You are already in the queue {message.author.mention}", delete_after=7)
+
         if 'of' in args:
             member.of_status = True
             member.update()
+
+        full_arg = ' '.join(args)
+        note = re.search(r'\[.*\]', full_arg)
+        if note:
+            note = note.group(0)[1:-1]
+        if note is None:
+            note = ''
+
         if not boss.get_first_in_queue_id():
             boss.queue_timeout = cfg.jst_time(minutes=self.timeout_minutes)
-        data = (boss.number, member.discord_id, member.name, False)
-        c.execute(f'INSERT INTO queue VALUES {data}')
+        data = (boss.number, member.discord_id, member.name, False, note)
+        c.execute('INSERT INTO queue VALUES (?,?,?,?,?)', data)
         self.conn.commit()
 
     def check_queue(self, message):
@@ -231,8 +243,8 @@ class Clan():
 
     def add_member(self, member):
         c = self.conn.cursor()
-        data = (member.id, member.display_name, 3, 0, 0, 0, 0, 0, 0, 0, False, 0, 0)
-        c.execute(f'INSERT INTO members_data VALUES {data}')
+        data = (member.id, member.display_name)
+        c.execute('INSERT INTO members_data VALUES (?,?,3, 0, 0, 0, 0, 0, 0, 0, False, 0, 0)', data)
         self.members.append(Member(member.id, self.conn))
         self.conn.commit()
 
@@ -249,7 +261,7 @@ class Clan():
     def add_damage_log(self, boss, member, damage: int, overflow=False, dead=False):
         c = self.conn.cursor()
         data = (boss.number, boss.wave - 1 * dead, member.discord_id, member.name, damage, overflow, dead, int(cfg.jst_time().timestamp()))
-        c.execute(f'INSERT INTO damage_log VALUES {data}')
+        c.execute('INSERT INTO damage_log VALUES (?,?,?,?,?,?,?,?)', data)
 
     # def revive_boss(self, hp):
     #     self.boss_num -= 1
@@ -331,7 +343,7 @@ class Clan():
             jst = message.created_at.astimezone(pytz.timezone('Japan')).strftime("%m/%d/%Y %H:%M:%S")
             log = (jst, message.author.display_name, message.clean_content)
             c = self.conn.cursor()
-            c.execute(f'INSERT INTO chat_log VALUES {log}')
+            c.execute('INSERT INTO chat_log VALUES (?,?,?)', log)
             self.conn.commit()
 
 
@@ -339,7 +351,7 @@ class Member:
     def __init__(self, discord_id: int, conn):
         self.conn = conn
         c = self.conn.cursor()
-        data = c.execute(f'select * from members_data where discord_id = {discord_id}').fetchone()
+        data = c.execute(f'SELECT * from members_data where discord_id = {discord_id}').fetchone()
         if data:
             columns = c.execute("PRAGMA table_info(members_data)").fetchall()
             for column in columns:
@@ -351,7 +363,7 @@ class Member:
         c = self.conn.cursor()
         for key, val in self.__dict__.items():
             try:
-                c.execute(f'UPDATE members_data SET {key} = {val} WHERE discord_id = {self.discord_id}')
+                c.execute(f'UPDATE members_data SET {key} = ? WHERE discord_id = ?', (val, self.discord_id))
             except sqlite3.OperationalError:
                 pass
         self.conn.commit()
@@ -380,7 +392,7 @@ class Boss():
         c = self.conn.cursor()
         for key, val in data.items():
             setattr(self, key, val)
-        boss_data = c.execute(f'select * from boss_data where number = {self.number}').fetchone()
+        boss_data = c.execute(f'SELECT * from boss_data where number = {self.number}').fetchone()
         if boss_data:
             boss_columns = c.execute("PRAGMA table_info(boss_data)").fetchall()
             for boss_column in boss_columns:
@@ -394,7 +406,7 @@ class Boss():
         c = self.conn.cursor()
         for key, val in self.__dict__.items():
             try:
-                c.execute(f'UPDATE boss_data SET {key} = {val} WHERE number = {self.number}')
+                c.execute(f'UPDATE boss_data SET {key} = ? WHERE number = ?', (val, self.number))
             except sqlite3.OperationalError:
                 pass
         self.conn.commit()
@@ -417,7 +429,7 @@ class Boss():
     def next(self):
         self.wave += 1
         self.tier = 1 + cfg.tier_threshold.index(max([i for i in cfg.tier_threshold if self.wave >= i]))
-        self.hp = self.max_hp[self.tier - 1] * 10 ** 6
+        self.hp = self.max_hp[self.tier - 1]
         self.update()
 
     def get_damage_log(self, wave_offset=0):
@@ -477,7 +489,7 @@ def create_cb_db(name, guild_id, channel_id):
                 d4_dmg int,
                 d5_dmg int,
                 rush_hour boolean)''')
-    c.execute(f'INSERT INTO cb_data VALUES ("{name}", {guild_id}, {channel_id}, 0, 0, 0, 0, 0, 0, False)')
+    c.execute('INSERT INTO cb_data VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, False)', (name, guild_id, channel_id))
 
     c.execute('''CREATE TABLE members_data
                 (discord_id int,
@@ -502,8 +514,8 @@ def create_cb_db(name, guild_id, channel_id):
                 hitting_member_id int,
                 syncing_member_id int)''')
     for boss in cfg.boss_data:
-        data = (boss['number'], boss['wave'], boss['hp'], 0, 0, 0)
-        c.execute(f'INSERT INTO boss_data VALUES {data}')
+        data = (boss['number'], boss['wave'], boss['hp'])
+        c.execute('INSERT INTO boss_data VALUES (?,?,?,0,0,0)', data)
 
     c.execute('''CREATE TABLE chat_log
                 (date_jst text,
@@ -524,7 +536,8 @@ def create_cb_db(name, guild_id, channel_id):
                 (boss_number int,
                 member_id int,
                 member_name text,
-                pinged bool)''')
+                pinged bool,
+                note text)''')
     conn.commit()
     conn.close()
 
@@ -533,9 +546,9 @@ def get_csv_table_data(table, c, r=False):
     row_name = [itemgetter(1)(col) for col in c.execute(f"PRAGMA table_info({table})").fetchall()]
     data = None
     if r:
-        data = [row_name] + list(reversed(c.execute(f'select * from {table}').fetchall()))
+        data = [row_name] + list(reversed(c.execute(f'SELECT * from {table}').fetchall()))
     else:
-        data = [row_name] + c.execute(f'select * from {table}').fetchall()
+        data = [row_name] + c.execute(f'SELECT * from {table}').fetchall()
     return data
 
 
@@ -628,8 +641,6 @@ def update_db(clan):
 
 if __name__ == "__main__":
     pass
-    conn = sqlite3.connect('cb_debug.db')
+    conn = sqlite3.connect('test_private_dev.db')
     c = conn.cursor()
-    a = c.execute('').fetchall()
-    print(a)
-    chat_log_csv('cb_debug')
+    a = c.execute('select * from cb_data')
