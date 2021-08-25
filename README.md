@@ -69,6 +69,5 @@ The OF status will remain until you perform a hit or use the !rmof command.
 You can also be granted the OF status by typing 'of' anywhere during any of the !q, !h, !s, !d or !dead commands (eg. !h b1 of)
 
 ## Notes
-* For now, most of the clan battle specific data has to be edited in the config.py file every month.
 * This bot is still under development, contact me on discord (SkySet#3043) if you have any questions or suggestions.
 * I will make a proper documentation and tutorials when everything is mostly done

@@ -215,10 +215,16 @@ class Clan():
         if note is None:
             note = ''
 
+        queue_wave = 0
+        for arg in args:
+            if re.match(r'^w[0-9]*$', arg):
+                queue_wave = max(boss.wave + 1, int(arg[1:]))
+                break
+
         if not boss.get_first_in_queue_id():
             boss.queue_timeout = cfg.jst_time(minutes=self.timeout_minutes)
-        data = (boss.number, member.discord_id, member.name, False, note)
-        c.execute('INSERT INTO queue VALUES (?,?,?,?,?)', data)
+        data = (boss.number, member.discord_id, member.name, False, note, int(cfg.jst_time().timestamp()), queue_wave)
+        c.execute('INSERT INTO queue VALUES (?,?,?,?,?,?,?)', data)
         self.conn.commit()
 
     def check_queue(self, message):
@@ -245,6 +251,7 @@ class Clan():
         c = self.conn.cursor()
         data = (member.id, member.display_name)
         c.execute('INSERT INTO members_data VALUES (?,?,3, 0, 0, 0, 0, 0, 0, 0, False, 0, 0)', data)
+        c.execute('INSERT INTO missed_hits_data VALUES (?,?,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)', data)
         self.members.append(Member(member.id, self.conn))
         self.conn.commit()
 
@@ -327,11 +334,25 @@ class Clan():
     def daily_reset(self):
         # self.rush_hour = False
         self.day = math.ceil((cfg.jst_time() - cfg.cb_start_date).total_seconds() / 60 / 60 / 24)
-        print('\nDay {} hits :'.format(self.day - 1))
+        prev_day = self.day - 1
+        print(f'\nDay {prev_day} hits :')
+        c = self.conn.cursor()
         for member in self.members:
+            data = list(c.execute(f'select total_missed_hits, total_missed_of, d{prev_day}_missed_hits, d{prev_day}_missed_of from missed_hits_data where discord_id = {member.discord_id}').fetchone())
             if member.remaining_hits > 0:
                 print('{0.name} had {0.remaining_hits} hits left'.format(member))
                 member.missed_hits += member.remaining_hits
+                data[0] += member.remaining_hits
+                data[2] = member.remaining_hits
+                data[1] += member.of_number
+                data[3] = member.of_number
+            c.execute(f"""UPDATE missed_hits_data
+                SET total_missed_hits = {data[0]},
+                total_missed_of = {data[1]},
+                d{prev_day}_missed_hits = {data[2]},
+                d{prev_day}_missed_of = {data[3]}
+                WHERE discord_id = {member.discord_id}""")
+
             member.remaining_hits = 3
             member.of_status = False
             member.of_number = 0
@@ -449,7 +470,23 @@ class Boss():
 
     def get_queue(self):
         c = self.conn.cursor()
-        data = c.execute(f'SELECT * from queue WHERE boss_number = {self.number}').fetchall()
+        data = c.execute(f'SELECT * from queue WHERE boss_number = {self.number} and wave = {self.wave}').fetchall()
+        data += c.execute(f'SELECT * from queue WHERE boss_number = {self.number} and wave < {self.wave}').fetchall()
+        if not data:
+            return None
+        queue = []
+        columns = c.execute("PRAGMA table_info(queue)").fetchall()
+        for member in data:
+            member_dict = {}
+            for column in columns:
+                if member[column[0]] is not None:
+                    member_dict[column[1]] = member[column[0]]
+            queue.append(member_dict)
+        return queue
+
+    def get_waiting(self):
+        c = self.conn.cursor()
+        data = c.execute(f'SELECT * from queue WHERE boss_number = {self.number} and wave > {self.wave} ORDER BY wave').fetchall()
         if not data:
             return None
         queue = []
@@ -537,7 +574,25 @@ def create_cb_db(name, guild_id, channel_id):
                 member_id int,
                 member_name text,
                 pinged bool,
-                note text)''')
+                note text,
+                timestamp int,
+                wave int)''')
+
+    c.execute('''CREATE TABLE missed_hits_data
+                (discord_id int,
+                name text,
+                total_missed_hits int,
+                total_missed_of int,
+                d1_missed_hits int,
+                d2_missed_hits int,
+                d3_missed_hits int,
+                d4_missed_hits int,
+                d5_missed_hits int,
+                d1_missed_of int,
+                d2_missed_of int,
+                d3_missed_of int,
+                d4_missed_of int,
+                d5_missed_of int)''')
     conn.commit()
     conn.close()
 
@@ -641,6 +696,6 @@ def update_db(clan):
 
 if __name__ == "__main__":
     pass
-    conn = sqlite3.connect('test_private_dev.db')
-    c = conn.cursor()
-    a = c.execute('select * from cb_data')
+    # conn = sqlite3.connect('test_private_dev.db')
+    # c = conn.cursor()
+    # a = c.execute('select * from cb_data')

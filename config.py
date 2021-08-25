@@ -14,7 +14,7 @@ else:
     print(f'Error: {discord_token_file_name} not found')
     exit()
 PREFIX = "!"
-ENV = 1
+ENV = 2
 DISABLE_DRIVE = True
 host = 'prd-priconne-redive.akamaized.net'
 manifest_path = '/dl/Resources/%s/Jpn/AssetBundles/Windows/manifest/%s_assetmanifest'
@@ -28,7 +28,7 @@ def jst_time(minutes=0, seconds=0):
 
 
 def get_prico_version():
-    default_ver = 10031020
+    default_ver = 10031150
     max_test_amount = 20
     test_multiplier = 10
     if ENV:
@@ -83,13 +83,15 @@ def get_boss_data(cb_id: int, tier_threshold: list):
         for wave_id in tier_data:
             boss_dict = {}
             boss_id, = c.execute(f'SELECT enemy_id_1 from wave_group_data where wave_group_id = {wave_id}').fetchone()
-            unit_id, name, hp = c.execute(f'SELECT unit_id, name, hp from enemy_parameter where enemy_id = {boss_id}').fetchone()
+            unit_id, name, hp, p_def, m_def = c.execute(f'SELECT unit_id, name, hp, def, magic_def from enemy_parameter where enemy_id = {boss_id}').fetchone()
             boss_dict['name'] = name
             boss_dict['number'] = boss_num
             boss_dict['wave'] = 1
             boss_dict['img'] = f'https://redive.estertion.win/icon/unit/{unit_id}.webp'
             boss_dict['hp'] = hp
             boss_dict['max_hp'] = hp
+            boss_dict['p.def'] = p_def
+            boss_dict['m.def'] = m_def
             boss_data[f't{phase}'].append(boss_dict)
             boss_num += 1
     return boss_data

@@ -98,7 +98,7 @@ class Boss_box():
         if self.wave_offset > 1:
             self.boss.queue_timeout = None
         elif self.boss.queue_timeout is None and not self.boss.hitting_member_id:
-            self.boss.queue_timeout = cfg.jst_time(minutes=cfg.timeout_minutes)
+            self.boss.queue_timeout = cfg.jst_time(minutes=self.clan.timeout_minutes)
         self.embed.set_author(name=f"Wave {self.boss.wave} (T{self.boss.tier})")
         self.embed.title = f"Boss {self.boss.number} : {self.boss.name}{f' [+{self.wave_offset}]' * (self.wave_offset > 0)}"
         self.set_description()
@@ -130,16 +130,23 @@ class Boss_box():
 
         # queue
         queue = self.boss.get_queue()
+        waiting_queue = self.boss.get_waiting()
         queue_text = ''
-        if queue:
+        if queue or waiting_queue:
             queue_text += '**Queue :** \n'
-            for member_data in queue:
-                member = self.clan.find_member(member_data['member_id'])
-                time_left = ''
-                if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
-                    time_left += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
-                note_text = f": {member_data['note']}" * bool(member_data['note'])
-                queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
+            if queue:
+                for member_data in queue:
+                    member = self.clan.find_member(member_data['member_id'])
+                    time_left = ''
+                    if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
+                        time_left += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
+                    note_text = f": {member_data['note']}" * bool(member_data['note'])
+                    queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
+            if waiting_queue:
+                for member_data in waiting_queue:
+                    member = self.clan.find_member(member_data['member_id'])
+                    note_text = f": {member_data['note']}" * bool(member_data['note'])
+                    queue_text += f"-[Wave{member_data['wave']}] {member.name}{note_text}{' (OF)' * member.of_status}\n"
             queue_text += '\n'
 
         description_text = f'{hp_text}{p_damage_text}{damage_text}{queue_text}'
@@ -155,7 +162,7 @@ class Boss_box():
             if sm_id:
                 if not self.discord_sm or self.discord_sm.id != sm_id:
                     self.discord_sm = await self.message.guild.fetch_member(sm_id)
-                self.embed.set_footer(text=f'{self.discord_hm.display_name} is curently hitting {clan_hm.remaining_hits}/3{" (OF)" * clan_hm.of_status} with {self.discord_sm.display_name}' * 30, icon_url=self.discord_hm.avatar_url)
+                self.embed.set_footer(text=f'{self.discord_hm.display_name} is curently hitting {clan_hm.remaining_hits}/3{" (OF)" * clan_hm.of_status} with {self.discord_sm.display_name}', icon_url=self.discord_hm.avatar_url)
             else:
                 self.embed.set_footer(text=f'{self.discord_hm.display_name} is curently hitting {clan_hm.remaining_hits}/3{" (OF)" * clan_hm.of_status}', icon_url=self.discord_hm.avatar_url)
         else:
