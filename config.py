@@ -14,7 +14,7 @@ else:
     print(f'Error: {discord_token_file_name} not found')
     exit()
 PREFIX = "!"
-ENV = 2
+ENV = 1
 DISABLE_DRIVE = True
 host = 'prd-priconne-redive.akamaized.net'
 manifest_path = '/dl/Resources/%s/Jpn/AssetBundles/Windows/manifest/%s_assetmanifest'
@@ -165,5 +165,5 @@ else:
     cb_start_date = data['cb_start_date']
     cb_end_date = data['cb_end_date']
     tz = pytz.timezone('Japan')
-    cb_start_date = datetime.datetime.strptime(cb_start_date, '%Y/%m/%d %H:%M').replace(tzinfo=tz)
-    cb_end_date = datetime.datetime.strptime(cb_end_date, '%Y/%m/%d %H:%M').replace(tzinfo=tz)
+    cb_start_date = datetime.datetime.strptime(cb_start_date, '%Y/%m/%d %H:%M:%S').replace(tzinfo=tz)
+    cb_end_date = datetime.datetime.strptime(cb_end_date, '%Y/%m/%d %H:%M:%S').replace(tzinfo=tz)
