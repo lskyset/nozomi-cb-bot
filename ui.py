@@ -1,3 +1,4 @@
+import datetime
 import discord
 import asyncio
 import time
@@ -94,18 +95,22 @@ class Boss_box():
         self.overview_button = None
 
     async def update(self):
-        self.wave_offset = self.boss.wave - self.clan.current_wave
-        if self.wave_offset > 1:
-            self.boss.queue_timeout = None
-        elif self.boss.queue_timeout is None and not self.boss.hitting_member_id:
-            self.boss.queue_timeout = cfg.jst_time(minutes=self.clan.timeout_minutes)
-        self.embed.set_author(name=f"Wave {self.boss.wave} (T{self.boss.tier})")
-        self.embed.title = f"Boss {self.boss.number} : {self.boss.name}{f' [+{self.wave_offset}]' * (self.wave_offset > 0)}"
-        self.set_description()
-        await self.set_footer()
-        self.set_components()
-        await self.message.edit(content=None, embed=self.embed, components=self.components)
-
+        # try:
+            self.wave_offset = self.boss.wave - self.clan.current_wave
+            if self.wave_offset > 1:
+                self.boss.queue_timeout = None
+            elif self.boss.queue_timeout is None and not self.boss.hitting_member_id:
+                self.boss.queue_timeout = cfg.jst_time(minutes=self.clan.timeout_minutes)
+            self.embed.set_author(name=f"Wave {self.boss.wave} (T{self.boss.tier})")
+            self.embed.title = f"Boss {self.boss.number} : {self.boss.name}{f' [+{self.wave_offset}]' * (self.wave_offset > 0)}"
+            self.set_description()
+            await self.set_footer()
+            self.set_components()
+        
+            await self.message.edit(content=None, embed=self.embed, components=self.components)
+        # except:
+        #     print("Oops we done goofed up")
+        
     def set_description(self):
         # title
         hp_text = "HP : *{:,} / {:,}* \n\n".format(self.boss.hp, self.boss.max_hp[self.boss.tier - 1])
@@ -138,10 +143,15 @@ class Boss_box():
                 for member_data in queue:
                     member = self.clan.find_member(member_data['member_id'])
                     time_left = ''
+                    time_since_queue = ''
+                    note_text = f": {member_data['note']}" * bool(member_data['note'])
                     if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
                         time_left += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
-                    note_text = f": {member_data['note']}" * bool(member_data['note'])
-                    queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
+                        queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
+                    
+                    if self.clan.timeout_minutes == 0:
+                        time_since_queue += time.strftime('[%H:%M:%S]', time.gmtime((datetime.datetime.now() - datetime.datetime.fromtimestamp(member_data['timestamp'])).seconds))
+                        queue_text += f"{time_since_queue} {member.name} {note_text} {' (OF)' * member.of_status}\n"
             if waiting_queue:
                 for member_data in waiting_queue:
                     member = self.clan.find_member(member_data['member_id'])
@@ -201,26 +211,30 @@ class Overview_box():
         )
 
     async def update(self):
-        self.embed.set_author(name=f"Tier {self.clan.current_tier}: Wave {self.clan.current_wave}")
-        self.embed.clear_fields()
-        for boss in self.bosses:
-            wave_offset = boss.wave - self.clan.current_wave
+        #try:
+            self.embed.set_author(name=f"Tier {self.clan.current_tier}: Wave {self.clan.current_wave}")
+            self.embed.clear_fields()
+            for boss in self.bosses:
+                wave_offset = boss.wave - self.clan.current_wave
+                self.embed.add_field(
+                    name=f'Boss {boss.number} : {boss.name}',
+                    value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n" + f"**HP :** *{boss.hp  // 10 ** 6}M / {boss.max_hp[boss.tier - 1] // 10 ** 6}M*\n",
+                )
+            hits_left = 0
+            for member in self.clan.members:
+                hits_left += member.remaining_hits
             self.embed.add_field(
-                name=f'Boss {boss.number} : {boss.name}',
-                value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n" + f"**HP :** *{boss.hp  // 10 ** 6}M / {boss.max_hp[boss.tier - 1] // 10 ** 6}M*\n",
+                name='Clan info',
+                value=f'**Hits done :** {len(self.clan.members) * 3 - hits_left} / {len(self.clan.members) * 3}',
             )
-        hits_left = 0
-        for member in self.clan.members:
-            hits_left += member.remaining_hits
-        self.embed.add_field(
-            name='Clan info',
-            value=f'**Hits done :** {len(self.clan.members) * 3 - hits_left} / {len(self.clan.members) * 3}',
-        )
-        self.components = [discord.ActionRow(
-            self.b1_button,
-            self.b2_button,
-            self.b3_button,
-            self.b4_button,
-            self.b5_button,
-        )]  # ,self.log_button]
-        await self.message.edit(content=None, embed=self.embed, components=self.components)
+            self.components = [discord.ActionRow(
+                self.b1_button,
+                self.b2_button,
+                self.b3_button,
+                self.b4_button,
+                self.b5_button,
+            )]  # ,self.log_button]
+            try:
+                await self.message.edit(content=None, embed=self.embed, components=self.components)
+            except:
+                print("Oops we fucked up")

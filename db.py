@@ -99,10 +99,11 @@ class Clan():
         if boss.hitting_member_id and boss.hitting_member_id != member.discord_id:
             await message.channel.send(f'Someone is already hitting B{boss.number} {message.author.mention}', delete_after=5)
             return False
-        fiq_iq = boss.get_first_in_queue_id()
-        if fiq_iq and member.discord_id != fiq_iq:
-            await message.channel.send(f"You don't have priority to hit this boss {message.author.mention}", delete_after=5)
-            return False
+        if self.skip_line != 1:    
+            fiq_iq = boss.get_first_in_queue_id()
+            if fiq_iq and member.discord_id != fiq_iq:
+                await message.channel.send(f"You don't have priority to hit this boss {message.author.mention}", delete_after=5)
+                return False
         member.of_status = 'of' in args or member.of_status
         boss.hitting_member_id = member.discord_id
         member.hitting_boss_number = boss.number
