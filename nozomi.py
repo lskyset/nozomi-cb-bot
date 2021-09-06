@@ -376,7 +376,7 @@ async def cb_init(channel, db_name, clan_config):
             clans.append(clan)
             for member in channel.guild.get_role(clan_config['CLAN_ROLE_ID']).members:
                 clan.add_member(member)
-            scheduler.add_job(daily_reset(channel.id, channel.guild.id), 'interval', args=[db_name], days=1, start_date=datetime.datetime(2021, 1, 10, 5, 0, 0))
+            # scheduler.add_job(daily_reset(channel.id, channel.guild.id), 'interval', args=[db_name], days=1, start_date=datetime.datetime(2021, 1, 10, 5, 0, 0))
             msg = f'{db_name}.db has been created and loaded.'
             clan.drive_update()
 

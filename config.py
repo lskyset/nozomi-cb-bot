@@ -130,7 +130,7 @@ def load_clans(clans_cgf_file_name):
             try:
                 clan_dict['default']
             except KeyError:
-                clan_dict['default'] = {'ENV': ENV, 'GUILD_ID': 0, 'CHANNEL_ID': 0, 'CLAN_ROLE_ID': 0, 'CLAN_MOD_ROLE_ID': 0, 'GOOGLE_DRIVE_SHEET': 0, 'TIMEOUT_MINUTES': 15}
+                clan_dict['default'] = {'ENV': ENV, 'GUILD_ID': 0, 'CHANNEL_ID': 0, 'CLAN_ROLE_ID': 0, 'CLAN_MOD_ROLE_ID': 0, 'GOOGLE_DRIVE_SHEET': 0, 'TIMEOUT_MINUTES': 15, "SKIP_LINE" : 1}
             for name, data in clan_dict.items():
                 for key, value in clan_dict['default'].items():
                     try:
@@ -140,7 +140,7 @@ def load_clans(clans_cgf_file_name):
             return clan_dict
     else:
         print(f'{clans_cgf_file_name} not found')
-        clan_dict = {'default': {'ENV': ENV, 'GUILD_ID': 0, 'CHANNEL_ID': 0, 'CLAN_ROLE_ID': 0, 'CLAN_MOD_ROLE_ID': 0, 'GOOGLE_DRIVE_SHEET': 0, 'TIMEOUT_MINUTES': 15}}
+        clan_dict = {'default': {'ENV': ENV, 'GUILD_ID': 0, 'CHANNEL_ID': 0, 'CLAN_ROLE_ID': 0, 'CLAN_MOD_ROLE_ID': 0, 'GOOGLE_DRIVE_SHEET': 0, 'TIMEOUT_MINUTES': 15, "SKIP_LINE" : 1}}
         with open(clans_cgf_file_name, 'w') as fd:
             fd.write(json.dumps(clan_dict, indent=4))
             print(f'a default {clans_cgf_file_name} was created')

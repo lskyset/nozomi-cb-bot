@@ -1,3 +1,4 @@
+import datetime
 import discord
 import asyncio
 import time
@@ -94,6 +95,7 @@ class Boss_box():
         self.overview_button = None
 
     async def update(self):
+
         self.wave_offset = self.boss.wave - self.clan.current_wave
         if self.wave_offset > 1:
             self.boss.queue_timeout = None
@@ -104,8 +106,10 @@ class Boss_box():
         self.set_description()
         await self.set_footer()
         self.set_components()
+    
         await self.message.edit(content=None, embed=self.embed, components=self.components)
 
+        
     def set_description(self):
         # title
         hp_text = "HP : *{:,} / {:,}* \n\n".format(self.boss.hp, self.boss.max_hp[self.boss.tier - 1])
@@ -138,10 +142,15 @@ class Boss_box():
                 for member_data in queue:
                     member = self.clan.find_member(member_data['member_id'])
                     time_left = ''
+                    time_since_queue = ''
+                    note_text = f": {member_data['note']}" * bool(member_data['note'])
                     if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
                         time_left += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))
-                    note_text = f": {member_data['note']}" * bool(member_data['note'])
-                    queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
+                        queue_text += f"-{time_left}{member.name}{note_text}{' (OF)' * member.of_status}\n"
+                    
+                    if self.clan.timeout_minutes == 0:
+                        time_since_queue += time.strftime('[%H:%M:%S]', time.gmtime((datetime.datetime.now() - datetime.datetime.fromtimestamp(member_data['timestamp'])).seconds))
+                        queue_text += f"{time_since_queue} {member.name} {note_text} {' (OF)' * member.of_status}\n"
             if waiting_queue:
                 for member_data in waiting_queue:
                     member = self.clan.find_member(member_data['member_id'])
