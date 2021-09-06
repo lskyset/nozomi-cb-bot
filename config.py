@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import urllib.request
-import requests
 import sqlite3
 
 discord_token_file_name = 'discord_token.txt'
@@ -16,48 +15,23 @@ else:
 PREFIX = "!"
 ENV = 1
 DISABLE_DRIVE = True
-host = 'prd-priconne-redive.akamaized.net'
-manifest_path = '/dl/Resources/%s/Jpn/AssetBundles/Windows/manifest/%s_assetmanifest'
-bundles_path = '/dl/pool/AssetBundles'
+
+default_params = {
+    'ENV': ENV,
+    'GUILD_ID': 0,
+    'CHANNEL_ID': 0,
+    'CLAN_ROLE_ID': 0,
+    'CLAN_MOD_ROLE_ID': 0,
+    'GOOGLE_DRIVE_SHEET': 0,
+    'TIMEOUT_MINUTES': 15,
+    "SKIP_LINE": 1,
+}
 
 
 def jst_time(minutes=0, seconds=0):
     utc_now = datetime.datetime.now(tz=pytz.timezone('UTC'))
     jst_now = utc_now.astimezone(pytz.timezone('Japan'))
     return jst_now + datetime.timedelta(minutes=minutes, seconds=seconds)
-
-
-def get_prico_version():
-    default_ver = 10031150
-    max_test_amount = 20
-    test_multiplier = 10
-    if ENV:
-        max_test_amount = 5
-
-    print('Checking for updates...')
-    ver = default_ver
-    i = 0
-    while i < max_test_amount:
-        guess = ver + i * test_multiplier
-        url = f'http://{host}{manifest_path % (guess, "manifest")}'
-        response = requests.get(url)
-        if response.status_code == 200:
-            ver = guess
-            i = 0
-        i += 1
-    return ver
-
-
-def get_prico_db(version):
-    # get masterdata.db
-    urllib.request.urlretrieve(f'http://{host}{manifest_path % (version, "masterdata")}', f'masterdata_{version}.txt')
-    cdb_path = f'master_{version}.cdb'
-    with open(f'masterdata_{version}.txt') as fd:
-        hash_ = fd.readline().split(',')[1]
-        urllib.request.urlretrieve(f'http://{host}{bundles_path}/{hash_[:2]}/{hash_}', cdb_path)
-    os.popen(f'Coneshell_call.exe -cdb  {cdb_path} master.db').close()
-    os.remove(f'masterdata_{version}.txt')
-    os.remove(f'master_{version}.cdb')
 
 
 def get_tier_treshold(cb_id: int):
@@ -108,18 +82,8 @@ def get_prico_db_data():
 
 
 def get_cb_data():
-    version = get_prico_version()
-    if os.path.isfile(f'cache_{version}.json'):
-        print(f'Version {version} is already up to date\n')
-        with open(f'cache_{version}.json', 'r') as fd:
-            data = json.load(fd)
-    else:
-        print(f'Found new version {version}, updating database...')
-        get_prico_db(version)
-        data = get_prico_db_data()
-        with open(f'cache_{version}.json', 'w') as fd:
-            fd.write(json.dumps(data, indent=4))
-        print('Updating Done\n')
+    urllib.request.urlretrieve('https://github.com/lskyset/nozomi-cb-data/raw/main/master.db', 'master.db')
+    data = get_prico_db_data()
     return data
 
 
@@ -130,7 +94,7 @@ def load_clans(clans_cgf_file_name):
             try:
                 clan_dict['default']
             except KeyError:
-                clan_dict['default'] = {'ENV': ENV, 'GUILD_ID': 0, 'CHANNEL_ID': 0, 'CLAN_ROLE_ID': 0, 'CLAN_MOD_ROLE_ID': 0, 'GOOGLE_DRIVE_SHEET': 0, 'TIMEOUT_MINUTES': 15, "SKIP_LINE" : 1}
+                clan_dict['default'] = default_params
             for name, data in clan_dict.items():
                 for key, value in clan_dict['default'].items():
                     try:
@@ -140,7 +104,7 @@ def load_clans(clans_cgf_file_name):
             return clan_dict
     else:
         print(f'{clans_cgf_file_name} not found')
-        clan_dict = {'default': {'ENV': ENV, 'GUILD_ID': 0, 'CHANNEL_ID': 0, 'CLAN_ROLE_ID': 0, 'CLAN_MOD_ROLE_ID': 0, 'GOOGLE_DRIVE_SHEET': 0, 'TIMEOUT_MINUTES': 15, "SKIP_LINE" : 1}}
+        clan_dict = {'default': default_params}
         with open(clans_cgf_file_name, 'w') as fd:
             fd.write(json.dumps(clan_dict, indent=4))
             print(f'a default {clans_cgf_file_name} was created')
