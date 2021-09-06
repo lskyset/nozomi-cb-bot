@@ -232,5 +232,4 @@ class Overview_box():
             self.b4_button,
             self.b5_button,
         )]  # ,self.log_button]
-
         await self.message.edit(content=None, embed=self.embed, components=self.components)
