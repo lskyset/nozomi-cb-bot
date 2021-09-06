@@ -95,21 +95,20 @@ class Boss_box():
         self.overview_button = None
 
     async def update(self):
-        # try:
-            self.wave_offset = self.boss.wave - self.clan.current_wave
-            if self.wave_offset > 1:
-                self.boss.queue_timeout = None
-            elif self.boss.queue_timeout is None and not self.boss.hitting_member_id:
-                self.boss.queue_timeout = cfg.jst_time(minutes=self.clan.timeout_minutes)
-            self.embed.set_author(name=f"Wave {self.boss.wave} (T{self.boss.tier})")
-            self.embed.title = f"Boss {self.boss.number} : {self.boss.name}{f' [+{self.wave_offset}]' * (self.wave_offset > 0)}"
-            self.set_description()
-            await self.set_footer()
-            self.set_components()
-        
-            await self.message.edit(content=None, embed=self.embed, components=self.components)
-        # except:
-        #     print("Oops we done goofed up")
+
+        self.wave_offset = self.boss.wave - self.clan.current_wave
+        if self.wave_offset > 1:
+            self.boss.queue_timeout = None
+        elif self.boss.queue_timeout is None and not self.boss.hitting_member_id:
+            self.boss.queue_timeout = cfg.jst_time(minutes=self.clan.timeout_minutes)
+        self.embed.set_author(name=f"Wave {self.boss.wave} (T{self.boss.tier})")
+        self.embed.title = f"Boss {self.boss.number} : {self.boss.name}{f' [+{self.wave_offset}]' * (self.wave_offset > 0)}"
+        self.set_description()
+        await self.set_footer()
+        self.set_components()
+    
+        await self.message.edit(content=None, embed=self.embed, components=self.components)
+
         
     def set_description(self):
         # title
@@ -211,30 +210,27 @@ class Overview_box():
         )
 
     async def update(self):
-        #try:
-            self.embed.set_author(name=f"Tier {self.clan.current_tier}: Wave {self.clan.current_wave}")
-            self.embed.clear_fields()
-            for boss in self.bosses:
-                wave_offset = boss.wave - self.clan.current_wave
-                self.embed.add_field(
-                    name=f'Boss {boss.number} : {boss.name}',
-                    value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n" + f"**HP :** *{boss.hp  // 10 ** 6}M / {boss.max_hp[boss.tier - 1] // 10 ** 6}M*\n",
-                )
-            hits_left = 0
-            for member in self.clan.members:
-                hits_left += member.remaining_hits
+        self.embed.set_author(name=f"Tier {self.clan.current_tier}: Wave {self.clan.current_wave}")
+        self.embed.clear_fields()
+        for boss in self.bosses:
+            wave_offset = boss.wave - self.clan.current_wave
             self.embed.add_field(
-                name='Clan info',
-                value=f'**Hits done :** {len(self.clan.members) * 3 - hits_left} / {len(self.clan.members) * 3}',
+                name=f'Boss {boss.number} : {boss.name}',
+                value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n" + f"**HP :** *{boss.hp  // 10 ** 6}M / {boss.max_hp[boss.tier - 1] // 10 ** 6}M*\n",
             )
-            self.components = [discord.ActionRow(
-                self.b1_button,
-                self.b2_button,
-                self.b3_button,
-                self.b4_button,
-                self.b5_button,
-            )]  # ,self.log_button]
-            try:
-                await self.message.edit(content=None, embed=self.embed, components=self.components)
-            except:
-                print("Oops we fucked up")
+        hits_left = 0
+        for member in self.clan.members:
+            hits_left += member.remaining_hits
+        self.embed.add_field(
+            name='Clan info',
+            value=f'**Hits done :** {len(self.clan.members) * 3 - hits_left} / {len(self.clan.members) * 3}',
+        )
+        self.components = [discord.ActionRow(
+            self.b1_button,
+            self.b2_button,
+            self.b3_button,
+            self.b4_button,
+            self.b5_button,
+        )]  # ,self.log_button]
+
+        await self.message.edit(content=None, embed=self.embed, components=self.components)

@@ -158,7 +158,7 @@ for boss in boss_data:
         boss['max_hp'].append(full_boss_data[f't{i+1}'][boss['number'] - 1]['max_hp'])
 
 if ENV:
-    boss_data = boss_data[:1]  # number of bosses to load from 1 to 5 (used for faster startup)
+    boss_data = boss_data[:5]  # number of bosses to load from 1 to 5 (used for faster startup)
     cb_start_date = jst_time()
     cb_end_date = cb_start_date + datetime.timedelta(minutes=(60 * 24 * 4 + 60 * 19 - 1))
 else:
