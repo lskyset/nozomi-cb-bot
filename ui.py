@@ -136,20 +136,18 @@ class Boss_box():
         queue = self.boss.get_queue()
         waiting_queue = self.boss.get_waiting()
         queue_text = ''
-        print(queue, waiting_queue)
         if queue or waiting_queue:
             queue_text += '**Queue :** \n'
             if queue:
                 for member_data in queue:
                     member = self.clan.find_member(member_data['member_id'])
-                    time_left = ''
-                    time_since_queue = ''
+                    time_text = ''
                     note_text = f": {member_data['note']}" * bool(member_data['note'])
                     if self.boss.queue_timeout and self.boss.hitting_member_id == 0 and member.discord_id == self.boss.get_first_in_queue_id() and self.clan.timeout_minutes > 0:
-                        time_left += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))         
+                        time_text += time.strftime('[%M:%S] ', time.gmtime(max((self.boss.queue_timeout - cfg.jst_time()).total_seconds(), 0)))         
                     if self.clan.timeout_minutes == 0:
-                        time_left += time.strftime('[%H:%M:%S]', time.gmtime((datetime.datetime.now() - datetime.datetime.fromtimestamp(member_data['timestamp'])).seconds))
-                    queue_text += f"-{time_left} {member.name} {note_text} {' (OF)' * member.of_status}\n"
+                        time_text += time.strftime('[%H:%M:%S]', time.gmtime((datetime.datetime.now() - datetime.datetime.fromtimestamp(member_data['timestamp'])).seconds))
+                    queue_text += f"-{time_text} {member.name} {note_text} {' (OF)' * member.of_status}\n"
             if waiting_queue:
                 for member_data in waiting_queue:
                     member = self.clan.find_member(member_data['member_id'])
