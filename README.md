@@ -58,24 +58,23 @@ Only the clan battle profiles with the same ENV value as the config variable wil
 ## Usage
 
 ### List of commands: (examples with B1)
-* `!q b1`  : Add yourself to B1's queue.
- * args : <ins>boss</ins>, of, [message], wave
-* `!dq b1` : Remove yourself from B1's queue.
- * args : <ins>boss</ins>
-* `!h b1` : Claim a hit on B1 (Means you're going to hit now)
- * args : <ins>boss</ins>, of
-* `!s b1 @member` : Claim a B1 hit with someone else. (sync)
- * args : <ins>boss</ins>,  <ins>@member</ins>, of,
+* `!q b1`  : Add yourself to B1's queue.<br>
+args : **boss**, of, [message], wave
+* `!dq b1` : Remove yourself from B1's queue.<br>
+args : **boss**
+* `!h b1` : Claim a hit on B1 (Means you're going to hit now)<br>
+args : **boss**, of
+* `!s b1 @member` : Claim a B1 hit with someone else. (sync)<br>
+args : **boss**,  **@member**, of
 * `!c` : Cancel a claimed hit.
-* `!d 1m` : Register 1 million damages to the boss you claimed. (dot and coma are counted as decimal separator)
- * args : <ins>damage</ins>, of
+* `!d 1m` : Register 1 million damages to the boss you claimed. (dot and coma are counted as decimal separator)<br>
+args : **damage**, of
 * `!dead` : Same as `!d` but kills the boss you claimed.
- * args : of
 * `!undo` : Undo the last hit you made as long as no one hit the boss after you.
 * `!of` : Gives you the OF status
 * `!rmof` : Removes your OF status
 
-*Argument with underline are required for the command to work.*<br>
+*Argument in bold are required for the command to work.*<br>
 *Commands and arguments are not case sensitive.*
 
 ### Arguments:
