@@ -333,9 +333,10 @@ class Clan():
         return False
 
     def daily_reset(self):
-        # self.rush_hour = False
         self.day = math.ceil((cfg.jst_time() - cfg.cb_start_date).total_seconds() / 60 / 60 / 24)
         prev_day = self.day - 1
+        if (prev_day < 1 or prev_day > 5):
+            return
         print(f'\nDay {prev_day} hits :')
         c = self.conn.cursor()
         for member in self.members:

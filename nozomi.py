@@ -61,8 +61,12 @@ async def on_message(message):
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound) or isinstance(error, commands.errors.InvalidEndOfQuotedStringError):
+    react_errors = (commands.CommandNotFound, commands.InvalidEndOfQuotedStringError)
+    ignore_errors = commands.CheckFailure
+    if isinstance(error, react_errors):
         await ctx.message.add_reaction(e.cross)
+    elif isinstance(error, ignore_errors):
+        return
     elif cfg.ENV > 0:
         raise error
 
@@ -88,9 +92,6 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     async def cog_check(self, ctx):  # check the cb date
         if (cfg.cb_end_date - cfg.jst_time()).total_seconds() < 0:
             await ctx.send(f'CB has ended {ctx.author.mention}', delete_after=5)
-            return False
-        if (cfg.jst_time() - cfg.cb_start_date).total_seconds() < 0:
-            await ctx.send(f"CB hasn't started yet {ctx.author.mention}", delete_after=5)
             return False
         return True
 
@@ -226,6 +227,9 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.member)
     async def done(self, ctx, *args):
         """ """
+        if (cfg.jst_time() - cfg.cb_start_date).total_seconds() < 0:
+            await ctx.send(f"CB hasn't started yet {ctx.author.mention}", delete_after=5)
+            return
         args = tuple(map(str.lower, args))
         clan = find_clan(ctx.message)
         if clan:
@@ -333,21 +337,21 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
         await ctx.message.add_reaction(e.ok)
         await bot.close()
 
-    @commands.command()
-    async def reload(self, ctx):
-        await ctx.message.add_reaction(e.ok)
-        for c_mem in ctx.guild.get_role(cfg.CLAN_ROLE_ID).members:
-            found = False
-            for db_mem in db.clan.members:
-                if c_mem.id == db_mem.discord_id:
-                    print('found')
-                    found = True
-                    break
-            if not found:
-                data = (c_mem.id, c_mem.display_name, 3, 0, 0, 0, 0, 0, 0)
-                db.insert('members_data', data)
-                db.clan.members.append(db.Member(data=data))
-        await ctx.send(f'Members list has been reloaded {ctx.author.mention}', delete_after=5)
+    # @commands.command()
+    # async def reload(self, ctx):
+    #     await ctx.message.add_reaction(e.ok)
+    #     for c_mem in ctx.guild.get_role(cfg.CLAN_ROLE_ID).members:
+    #         found = False
+    #         for db_mem in db.clan.members:
+    #             if c_mem.id == db_mem.discord_id:
+    #                 print('found')
+    #                 found = True
+    #                 break
+    #         if not found:
+    #             data = (c_mem.id, c_mem.display_name, 3, 0, 0, 0, 0, 0, 0)
+    #             db.insert('members_data', data)
+    #             db.clan.members.append(db.Member(data=data))
+    #     await ctx.send(f'Members list has been reloaded {ctx.author.mention}', delete_after=5)
 
 
 bot.add_cog(Global_commands(bot))
@@ -366,7 +370,7 @@ async def cb_init(channel, db_name, clan_config):
         scheduler.configure(jobstores=jobstores, job_defaults=job_defaults, timezone=pytz.timezone('Japan'))
         path = f'{db_name}.db'
         if os.path.isfile(path) or (not cfg.DISABLE_DRIVE and db.download_db(path)):
-            msg = f'{db_name}.db has been loaded.'
+            msg = f'{db_name}.db has been started.'
             clan = db.Clan(db_name, clan_config)
             clans.append(clan)
         else:
@@ -375,8 +379,8 @@ async def cb_init(channel, db_name, clan_config):
             clans.append(clan)
             for member in channel.guild.get_role(clan_config['CLAN_ROLE_ID']).members:
                 clan.add_member(member)
-            # scheduler.add_job(daily_reset(channel.id, channel.guild.id), 'interval', args=[db_name], days=1, start_date=datetime.datetime(2021, 1, 10, 5, 0, 0))
-            msg = f'{db_name}.db has been created and loaded.'
+            scheduler.add_job(daily_reset, 'interval', args=[channel.guild.id, channel.id], days=1, start_date=cfg.cb_start_date)
+            msg = f'{db_name}.db has been created and started.'
             clan.drive_update()
 
         mods_members = channel.guild.get_role(clan_config['CLAN_MOD_ROLE_ID']).members
@@ -391,7 +395,7 @@ async def cb_init(channel, db_name, clan_config):
         await clan.ui.start(channel, clan)
 
 
-def daily_reset(channel_id, guild_id):
+def daily_reset(guild_id: int, channel_id: int):
     for clan in clans:
         if clan.guild_id == guild_id and clan.channel_id == channel_id:
             clan.is_daily_reset = True

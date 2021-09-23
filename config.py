@@ -13,7 +13,7 @@ else:
     print(f'Error: {discord_token_file_name} not found')
     exit()
 PREFIX = "!"
-ENV = 1
+ENV = 1  # change this to 0 for prod
 DISABLE_DRIVE = True
 
 default_params = {
@@ -23,8 +23,8 @@ default_params = {
     'CLAN_ROLE_ID': 0,
     'CLAN_MOD_ROLE_ID': 0,
     'GOOGLE_DRIVE_SHEET': 0,
-    'TIMEOUT_MINUTES': 15,
-    "SKIP_LINE": 1,
+    'TIMEOUT_MINUTES': 15,  # zero is infinite timeout
+    "SKIP_LINE": 0,  # 1 disables the restrictions on the queue making it only a visual indicator of intent
 }
 
 
@@ -119,7 +119,7 @@ boss_data = full_boss_data['t1']
 for boss in boss_data:
     boss['max_hp'] = [boss['max_hp']]
     for i in range(1, 5):
-        boss['max_hp'].append(full_boss_data[f't{i+1}'][boss['number'] - 1]['max_hp'])
+        boss['max_hp'].append(full_boss_data[f't{i + 1}'][boss['number'] - 1]['max_hp'])
 
 if ENV:
     boss_data = boss_data[:5]  # number of bosses to load from 1 to 5 (used for faster startup)
