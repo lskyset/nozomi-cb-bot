@@ -322,6 +322,7 @@ class Clan():
                 self.conn.commit()
                 boss.hp = hit['damage']
                 boss.wave -= 1
+                boss.tier = 1 + cfg.tier_threshold.index(max([i for i in cfg.tier_threshold if boss.wave >= i]))
                 member.remaining_hits += (hit['overflow'] + 1) % 2
                 member.of_number += hit['overflow']
                 setattr(member, f'b{boss.number}_hits', getattr(member, f'b{boss.number}_hits') - 1)
