@@ -3,3 +3,6 @@
 *.csv
 *.json
 discord_token.txt
+.dockerignore
+Dockerfile
+mycreds.txt

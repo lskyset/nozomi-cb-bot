@@ -13,7 +13,7 @@ else:
     print(f'Error: {discord_token_file_name} not found')
     exit()
 PREFIX = "!"
-ENV = 1  # change this to 0 for prod
+ENV = 5  # change this to 0 for prod
 DISABLE_DRIVE = True
 
 default_params = {
@@ -54,6 +54,8 @@ def get_boss_data(cb_id: int, tier_threshold: list):
         phase, *tier_data = c.execute(f'SELECT phase, wave_group_id_1, wave_group_id_2, wave_group_id_3, wave_group_id_4, wave_group_id_5  from clan_battle_2_map_data where clan_battle_id={cb_id} and lap_num_from={lap_num}').fetchone()
         boss_data[f't{phase}'] = []
         boss_num = 1
+        print(tier_data)
+
         for wave_id in tier_data:
             boss_dict = {}
             boss_id, = c.execute(f'SELECT enemy_id_1 from wave_group_data where wave_group_id = {wave_id}').fetchone()
@@ -91,16 +93,9 @@ def load_clans(clans_cgf_file_name):
     if os.path.isfile(clans_cgf_file_name):
         with open('clans_config.json', 'r') as clans_cfg:
             clan_dict = json.load(clans_cfg)
-            try:
-                clan_dict['default']
-            except KeyError:
-                clan_dict['default'] = default_params
+            clan_dict.setdefault('default', default_params)
             for name, data in clan_dict.items():
-                for key, value in clan_dict['default'].items():
-                    try:
-                        data[key]
-                    except KeyError:
-                        data[key] = value
+                clan_dict[name] = {**default_params, **data}
             return clan_dict
     else:
         print(f'{clans_cgf_file_name} not found')
@@ -114,11 +109,12 @@ def load_clans(clans_cgf_file_name):
 CLANS = load_clans('clans_config.json')
 data = get_cb_data()
 tier_threshold = data['tier_threshold']
+print(tier_threshold)
 full_boss_data = data['boss_data']
 boss_data = full_boss_data['t1']
 for boss in boss_data:
     boss['max_hp'] = [boss['max_hp']]
-    for i in range(1, 5):
+    for i in range(1, len(tier_threshold)):
         boss['max_hp'].append(full_boss_data[f't{i + 1}'][boss['number'] - 1]['max_hp'])
 
 if ENV:

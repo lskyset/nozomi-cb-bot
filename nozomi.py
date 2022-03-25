@@ -336,6 +336,23 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
             clan.conn.close()
         await ctx.message.add_reaction(e.ok)
         await bot.close()
+        
+    @commands.command(aliases=('force_reset',))
+    async def force_daily_reset(self, ctx):
+        """ """
+        daily_reset()
+
+    @commands.command()
+    async def imp(self, ctx, *args):
+        """ Impersonate someone else """
+        if ctx.message.mentions:
+            member = ctx.message.mentions[0]
+            clan = find_clan(ctx.message)
+            if clan:
+                message = ctx.message
+                message.author = member
+                message.content = ' '.join(message.content.split(' ')[2:])
+                await bot.process_commands(message)
 
     # @commands.command()
     # async def reload(self, ctx):
@@ -379,7 +396,7 @@ async def cb_init(channel, db_name, clan_config):
             clans.append(clan)
             for member in channel.guild.get_role(clan_config['CLAN_ROLE_ID']).members:
                 clan.add_member(member)
-            scheduler.add_job(daily_reset, 'interval', args=[channel.guild.id, channel.id], days=1, start_date=cfg.cb_start_date)
+            # scheduler.add_job(daily_reset, 'interval', args=[channel.guild.id, channel.id], days=1, start_date=cfg.cb_start_date)
             msg = f'{db_name}.db has been created and started.'
             clan.drive_update()
 
@@ -390,15 +407,14 @@ async def cb_init(channel, db_name, clan_config):
         clan.is_daily_reset = False
         scheduler.start()
         print(f'{msg[:-1]} in "{channel.guild.name}" #{channel.name}.')
-        await channel.send(msg, delete_after=5)
+        # await channel.send(msg, delete_after=5)
         clan.ui = Ui()
         await clan.ui.start(channel, clan)
 
 
-def daily_reset(guild_id: int, channel_id: int):
+def daily_reset():
     for clan in clans:
-        if clan.guild_id == guild_id and clan.channel_id == channel_id:
-            clan.is_daily_reset = True
+        clan.daily_reset()
 
 
 # def bot_export(message):
