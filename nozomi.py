@@ -90,9 +90,9 @@ class Cb_commands(commands.Cog, name='CB Commands'):
         self.ui_update_loop.start()
 
     async def cog_check(self, ctx):  # check the cb date
-        if (cfg.cb_end_date - cfg.jst_time()).total_seconds() < 0:
-            await ctx.send(f'CB has ended {ctx.author.mention}', delete_after=5)
-            return False
+        # if (cfg.cb_end_date - cfg.jst_time()).total_seconds() < 0:
+        #     await ctx.send(f'CB has ended {ctx.author.mention}', delete_after=5)
+        #     return False
         return True
 
     def cog_unload(self):
@@ -261,14 +261,19 @@ class Cb_commands(commands.Cog, name='CB Commands'):
             if clan.is_daily_reset:
                 clan.daily_reset()
                 clan.is_daily_reset = False
-            for boss in clan.bosses:
-                if boss.hitting_member_id == 0 and boss.queue_timeout:
-                    guild = bot.get_guild(clan.guild_id)
-                    channel = guild.get_channel(clan.channel_id)
-                    message = channel.get_partial_message(boss.message_id)
-                    if clan.timeout_minutes > 0:
-                        clan.check_queue(message)
-                    await clan.ui.update(boss.message_id)
+
+            guild = bot.get_guild(clan.guild_id)
+            channel = guild.get_channel(clan.channel_id)
+            if self.ui_update_loop.current_loop % 150 == 0:
+                await channel.send("Reloading messages, please wait", delete_after=10)
+                await clan.ui.start(channel, clan)
+            else:
+                for boss in clan.bosses:
+                    if boss.hitting_member_id == 0 and boss.queue_timeout:
+                        message = channel.get_partial_message(boss.message_id)
+                        if clan.timeout_minutes > 0:
+                            clan.check_queue(message)
+                        await clan.ui.update(boss.message_id)
 
 
 class Mod_commands(commands.Cog, name='Mod Commands'):
@@ -336,7 +341,7 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
             clan.conn.close()
         await ctx.message.add_reaction(e.ok)
         await bot.close()
-        
+
     @commands.command(aliases=('force_reset',))
     async def force_daily_reset(self, ctx):
         """ """

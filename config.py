@@ -13,7 +13,7 @@ else:
     print(f'Error: {discord_token_file_name} not found')
     exit()
 PREFIX = "!"
-ENV = 5  # change this to 0 for prod
+ENV = 1  # change this to 0 for prod
 DISABLE_DRIVE = True
 
 default_params = {
@@ -54,7 +54,6 @@ def get_boss_data(cb_id: int, tier_threshold: list):
         phase, *tier_data = c.execute(f'SELECT phase, wave_group_id_1, wave_group_id_2, wave_group_id_3, wave_group_id_4, wave_group_id_5  from clan_battle_2_map_data where clan_battle_id={cb_id} and lap_num_from={lap_num}').fetchone()
         boss_data[f't{phase}'] = []
         boss_num = 1
-        print(tier_data)
 
         for wave_id in tier_data:
             boss_dict = {}
@@ -109,7 +108,6 @@ def load_clans(clans_cgf_file_name):
 CLANS = load_clans('clans_config.json')
 data = get_cb_data()
 tier_threshold = data['tier_threshold']
-print(tier_threshold)
 full_boss_data = data['boss_data']
 boss_data = full_boss_data['t1']
 for boss in boss_data:
