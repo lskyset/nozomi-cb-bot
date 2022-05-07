@@ -107,3 +107,16 @@ You can also be granted the OF status by typing 'of' anywhere during any of the 
 ## Notes
 * This bot is still under development, contact me on discord (SkySet#3043) if you have any questions or suggestions.
 * I'm currently rewriting the bot in javascript since the python library i was using will no longer be updated.
+
+## Setup
+```sh
+# Install dependencies
+pipenv install --dev
+
+# Setup pre-commit and pre-push hooks
+pipenv run pre-commit install -t pre-commit
+pipenv run pre-commit install -t pre-push
+```
+
+## Credits
+This package was created with Cookiecutter and the [sourcery-ai/python-best-practices-cookiecutter](https://github.com/sourcery-ai/python-best-practices-cookiecutter) project template.
