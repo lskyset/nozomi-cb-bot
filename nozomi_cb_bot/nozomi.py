@@ -14,8 +14,6 @@ from .commands.util import find_clan
 from .config import PREFIX as P
 from .ui import Ui
 
-clans = []  # type: ignore
-
 intents = discord.Intents.default()
 intents.members = True
 
@@ -26,6 +24,7 @@ bot = commands.Bot(
     case_insensitive=True,
 )
 bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category="Other")
+bot.clans = []
 
 
 @bot.event
@@ -48,7 +47,7 @@ async def on_button_click(i: discord.Interaction, b: discord.ButtonClick):
 
 @bot.event
 async def on_message(message):
-    clan = find_clan(message, clans)
+    clan = find_clan(message, bot.clans)
     if clan:
         clan.log(message)
         if message.author.bot:
@@ -93,11 +92,11 @@ def setup_database(path, db_name, clan_config, channel):
         msg = f"{db_name}.db has been started."
         print_database_message(msg, channel)
         clan = db.Clan(db_name, clan_config)
-        clans.append(clan)
+        bot.clans.append(clan)
     else:
         db.create_cb_db(db_name, channel.guild.id, channel.id)
         clan = db.Clan(db_name, clan_config)
-        clans.append(clan)
+        bot.clans.append(clan)
         for member in channel.guild.get_role(clan_config["CLAN_ROLE_ID"]).members:
             clan.add_member(member)
         msg = f"{db_name}.db has been created and started."
