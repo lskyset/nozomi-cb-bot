@@ -1,3 +1,7 @@
+# Warning
+
+Due to discord's new rate limit on messages older than one hour the bot is not updating properly.
+
 # nozomi-cb-bot
 
 Here is the source code for Nozomi.
