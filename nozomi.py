@@ -258,8 +258,8 @@ class Cb_commands(commands.Cog, name='CB Commands'):
 
     @tasks.loop(seconds=20)
     async def ui_update_loop(self):
-        print(f'INFO: UI Update loop run {self.i}')
-        self.i = self.i + 1
+        print(f'INFO: UI Update loop run {self.ui_update_num}')
+        self.ui_update_num = self.ui_update_num + 1
         for clan in clans:
             if clan.is_daily_reset:
                 clan.daily_reset()
