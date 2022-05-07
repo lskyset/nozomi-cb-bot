@@ -2,25 +2,26 @@ import os
 import time
 
 import discord
-import pytz
 from discord.ext import commands, tasks
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
-import db
-import config as cfg
-from config import PREFIX as P
-import emoji as e
-from ui import Ui
+from . import config as cfg
+from . import db
+from . import emoji as e
+from .config import PREFIX as P
+from .ui import Ui
 
-
-clans = []
+clans = []  # type: ignore
 
 intents = discord.Intents.default()
 intents.members = True
 
-bot = commands.Bot(command_prefix=P, description="List of commands : (Under construction)", intents=intents, case_insensitive=True)
-bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category='Other')
+bot = commands.Bot(
+    command_prefix=P,
+    description="List of commands : (Under construction)",
+    intents=intents,
+    case_insensitive=True,
+)
+bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category="Other")
 
 
 def find_clan(message):
@@ -32,10 +33,10 @@ def find_clan(message):
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user}.\n')
+    print(f"Logged in as {bot.user}.\n")
     for cfg_clan_name, cfg_clan_data in cfg.CLANS.items():
-        if cfg_clan_data['ENV'] == cfg.ENV and cfg_clan_name != 'default':
-            channel = bot.get_channel(cfg_clan_data['CHANNEL_ID'])
+        if cfg_clan_data["ENV"] == cfg.ENV and cfg_clan_name != "default":
+            channel = bot.get_channel(cfg_clan_data["CHANNEL_ID"])
             await cb_init(channel, cfg_clan_name, cfg_clan_data)
 
 
@@ -71,20 +72,22 @@ async def on_command_error(ctx, error):
         raise error
 
 
-class Global_commands(commands.Cog, name='Global Commands'):
+class Global_commands(commands.Cog, name="Global Commands"):  # type: ignore
     """Global Commands are commands that can be used at any time"""
+
     def __init__(self, bot):
         self.bot = bot
 
     @commands.command(hidden=True)
     async def hello(self, ctx):
         """Says hello and mention the user (used for testing purposes)"""
-        msg = f'Hello {ctx.author.mention}'
+        msg = f"Hello {ctx.author.mention}"
         await ctx.send(msg)
 
 
-class Cb_commands(commands.Cog, name='CB Commands'):
+class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     """CB Commands are commands that can be used in a channel where a clan battle database has been loaded."""
+
     def __init__(self, bot):
         self.bot = bot
         self.ui_update_loop.start()
@@ -118,7 +121,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                 member.of_status = False
                 await ctx.message.add_reaction(e.ok)
 
-    @commands.command(aliases=('q', 'que'))
+    @commands.command(aliases=("q", "que"))
     async def queue(self, ctx, *args, from_button=False):
         """ """
         args = tuple(map(str.lower, args))
@@ -129,7 +132,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                 boss_message = ctx.message
             else:
                 for boss in clan.bosses:
-                    if f'b{boss.number}' in args:
+                    if f"b{boss.number}" in args:
                         boss_message = await ctx.channel.fetch_message(boss.message_id)
                         boss_message.author = ctx.author
                         break
@@ -139,11 +142,17 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                 await clan.ui.update(boss_message.id)
             else:
                 if args:
-                    await ctx.send(f"Boss not found {ctx.author.mention}\nUse for example `{P}q b1` to queue for b1", delete_after=7)
+                    await ctx.send(
+                        f"Boss not found {ctx.author.mention}\nUse for example `{P}q b1` to queue for b1",
+                        delete_after=7,
+                    )
                 else:
-                    await ctx.send(f"Argument not found {ctx.author.mention}\nUse for example `{P}q b1` to queue for b1", delete_after=7)
+                    await ctx.send(
+                        f"Argument not found {ctx.author.mention}\nUse for example `{P}q b1` to queue for b1",
+                        delete_after=7,
+                    )
 
-    @commands.command(aliases=('dq', 'dque'))
+    @commands.command(aliases=("dq", "dque"))
     async def dequeue(self, ctx, *args):
         """ """
         args = tuple(map(str.lower, args))
@@ -151,7 +160,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
         if clan:
             boss_message = None
             for boss in clan.bosses:
-                if f'b{boss.number}' in args:
+                if f"b{boss.number}" in args:
                     boss_message = await ctx.channel.fetch_message(boss.message_id)
                     boss_message.author = ctx.author
                     break
@@ -159,9 +168,12 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                 clan.dequeue(ctx.author.id, boss_message)
                 await clan.ui.update(boss.message_id)
             else:
-                await ctx.send(f"Argument not found {ctx.author.mention}\nUse for example `{P}dq b1` to unqueue yourself from b1's queue", delete_after=7)
+                await ctx.send(
+                    f"Argument not found {ctx.author.mention}\nUse for example `{P}dq b1` to unqueue yourself from b1's queue",
+                    delete_after=7,
+                )
 
-    @commands.command(aliases=('h', 'hitting'))
+    @commands.command(aliases=("h", "hitting"))
     async def hit(self, ctx, *args, from_button=False):
         """ """
         args = tuple(map(str.lower, args))
@@ -172,7 +184,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                 boss_message = ctx.message
             else:
                 for boss in clan.bosses:
-                    if f'b{boss.number}' in args:
+                    if f"b{boss.number}" in args:
                         boss_message = await ctx.channel.fetch_message(boss.message_id)
                         boss_message.author = ctx.author
                         break
@@ -181,41 +193,61 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                 await clan.ui.update(boss_message.id)
             else:
                 if args:
-                    await ctx.send(f"Boss not found {ctx.author.mention}\nUse for example `{P}h b1` to hit b1", delete_after=7)
+                    await ctx.send(
+                        f"Boss not found {ctx.author.mention}\nUse for example `{P}h b1` to hit b1",
+                        delete_after=7,
+                    )
                 else:
-                    await ctx.send(f"Argument not found {ctx.author.mention}\nUse for example `{P}h b1` to hit b1", delete_after=7)
+                    await ctx.send(
+                        f"Argument not found {ctx.author.mention}\nUse for example `{P}h b1` to hit b1",
+                        delete_after=7,
+                    )
 
-    @commands.command(aliases=('s', 'syncing'))
+    @commands.command(aliases=("s", "syncing"))
     async def sync(self, ctx, *args):
         """ """
         args = tuple(map(str.lower, args))
         if ctx.message.mentions:
             sync_member = ctx.message.mentions[0]
             if sync_member == ctx.author:
-                await ctx.send(f"You can't sync with yourself {ctx.author.mention}", delete_after=5)
+                await ctx.send(
+                    f"You can't sync with yourself {ctx.author.mention}", delete_after=5
+                )
                 return
             clan = find_clan(ctx.message)
             if clan:
                 boss_message = None
                 hit_member = clan.find_member(ctx.author.id)
                 if hit_member.hitting_boss_number:
-                    boss_message = await ctx.channel.fetch_message(clan.bosses[hit_member.hitting_boss_number - 1].message_id)
+                    boss_message = await ctx.channel.fetch_message(
+                        clan.bosses[hit_member.hitting_boss_number - 1].message_id
+                    )
                     boss_message.author = ctx.author
                 else:
                     for boss in clan.bosses:
-                        if (f'b{boss.number}' in args):
-                            boss_message = await ctx.channel.fetch_message(boss.message_id)
+                        if f"b{boss.number}" in args:
+                            boss_message = await ctx.channel.fetch_message(
+                                boss.message_id
+                            )
                             boss_message.author = ctx.author
                             break
                 if boss_message:
-                    await clan.syncing(ctx.author.id, sync_member.id, boss_message, *args)
+                    await clan.syncing(
+                        ctx.author.id, sync_member.id, boss_message, *args
+                    )
                     await clan.ui.update(boss_message.id)
                 else:
-                    await ctx.send(f"Boss not found {ctx.author.mention}\nUse for example `{P}s b1 @Nozomi` to hit b1 with Nozomi", delete_after=5)
+                    await ctx.send(
+                        f"Boss not found {ctx.author.mention}\nUse for example `{P}s b1 @Nozomi` to hit b1 with Nozomi",
+                        delete_after=5,
+                    )
         else:
-            await ctx.send(f'You need to mention the person syncing with you {ctx.author.mention}', delete_after=5)
+            await ctx.send(
+                f"You need to mention the person syncing with you {ctx.author.mention}",
+                delete_after=5,
+            )
 
-    @commands.command(aliases=('c',))
+    @commands.command(aliases=("c",))
     async def cancel(self, ctx):
         """ """
         clan = find_clan(ctx.message)
@@ -223,27 +255,29 @@ class Cb_commands(commands.Cog, name='CB Commands'):
             boss = clan.cancel_hit(ctx.message.author.id, ctx.message)
             await clan.ui.update(boss.message_id)
 
-    @commands.command(aliases=('d',))
+    @commands.command(aliases=("d",))
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.member)
     async def done(self, ctx, *args):
         """ """
         if (cfg.jst_time() - cfg.cb_start_date).total_seconds() < 0:
-            await ctx.send(f"CB hasn't started yet {ctx.author.mention}", delete_after=5)
+            await ctx.send(
+                f"CB hasn't started yet {ctx.author.mention}", delete_after=5
+            )
             return
         args = tuple(map(str.lower, args))
         clan = find_clan(ctx.message)
         if clan:
             boss_message_id = await clan.done(ctx.message.author.id, ctx.message, *args)
-            bot.get_command('done').reset_cooldown(ctx)
+            bot.get_command("done").reset_cooldown(ctx)
             await clan.ui.update(boss_message_id)
 
     @commands.command()
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.member)
     async def dead(self, ctx, *args):
         """ """
-        args = ((str(10 ** 9 - 1), *args))
+        args = (str(10 ** 9 - 1), *args)
         await self.done(ctx, *args)
-        bot.get_command('dead').reset_cooldown(ctx)
+        bot.get_command("dead").reset_cooldown(ctx)
 
     @commands.command()
     async def undo(self, ctx):
@@ -276,8 +310,9 @@ class Cb_commands(commands.Cog, name='CB Commands'):
                         await clan.ui.update(boss.message_id)
 
 
-class Mod_commands(commands.Cog, name='Mod Commands'):
+class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
     """Mod Commands are commands that can only be used by the clan's leader and sub-leaders."""
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -285,15 +320,18 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
         clan = find_clan(ctx.message)
         if ctx.author.id in clan.mods:
             return True
-        if not ctx.message.content.startswith(f'{P}help'):
-            await ctx.send(f'You dont have the permission to use this command {ctx.author.mention}', delete_after=5)
+        if not ctx.message.content.startswith(f"{P}help"):
+            await ctx.send(
+                f"You dont have the permission to use this command {ctx.author.mention}",
+                delete_after=5,
+            )
         return False
 
     # @commands.command(brief='Start a clan battle.')
     # async def init(self, ctx, name='cb'):
     #     """Create a clan battle database and start a clan battle in the channel the command was used."""
 
-    @commands.command(aliases=('fc',))
+    @commands.command(aliases=("fc",))
     async def force_cancel(self, ctx):
         """ """
         if ctx.message.mentions:
@@ -304,7 +342,7 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
                 await ctx.message.add_reaction(e.ok)
                 await clan.ui.update(boss.message_id)
 
-    @commands.command(aliases=('fdq',))
+    @commands.command(aliases=("fdq",))
     async def force_dequeue(self, ctx, *args):
         """ """
         args = tuple(map(str.lower, args))
@@ -314,7 +352,7 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
             if clan:
                 boss_message = None
                 for boss in clan.bosses:
-                    if f'b{boss.number}' in args:
+                    if f"b{boss.number}" in args:
                         boss_message = await ctx.channel.fetch_message(boss.message_id)
                         boss_message.author = ctx.author
                         break
@@ -322,7 +360,10 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
                     clan.dequeue(member.id, boss_message)
                     await clan.ui.update(boss.message_id)
                 else:
-                    await ctx.send(f"Argument not found {ctx.author.mention}\nUse for example `{P}fdq @Nozomi b1` to unqueue Nozomi from b1's queue", delete_after=5)
+                    await ctx.send(
+                        f"Argument not found {ctx.author.mention}\nUse for example `{P}fdq @Nozomi b1` to unqueue Nozomi from b1's queue",
+                        delete_after=5,
+                    )
 
     @commands.command()
     async def stop(self, ctx):
@@ -342,7 +383,7 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
         await ctx.message.add_reaction(e.ok)
         await bot.close()
 
-    @commands.command(aliases=('force_reset',))
+    @commands.command(aliases=("force_reset",))
     async def force_daily_reset(self, ctx):
         """ """
         daily_reset()
@@ -356,7 +397,7 @@ class Mod_commands(commands.Cog, name='Mod Commands'):
             if clan:
                 message = ctx.message
                 message.author = member
-                message.content = ' '.join(message.content.split(' ')[2:])
+                message.content = " ".join(message.content.split(" ")[2:])
                 await bot.process_commands(message)
 
     # @commands.command()
@@ -385,32 +426,27 @@ async def cb_init(channel, db_name, clan_config):
     msg = None
     if db_name:
         if cfg.ENV > 0:
-            db_name += '_dev'
-        jobstores = {'default': SQLAlchemyJobStore(url='sqlite:///{}.db'.format(db_name))}
-        job_defaults = {'coalesce': True, 'misfire_grace_time': None}
-        scheduler = AsyncIOScheduler()
-        scheduler.configure(jobstores=jobstores, job_defaults=job_defaults, timezone=pytz.timezone('Japan'))
-        path = f'{db_name}.db'
+            db_name += "_dev"
+        path = f"{db_name}.db"
         if os.path.isfile(path) or (not cfg.DISABLE_DRIVE and db.download_db(path)):
-            msg = f'{db_name}.db has been started.'
+            msg = f"{db_name}.db has been started."
             clan = db.Clan(db_name, clan_config)
             clans.append(clan)
         else:
             db.create_cb_db(db_name, channel.guild.id, channel.id)
             clan = db.Clan(db_name, clan_config)
             clans.append(clan)
-            for member in channel.guild.get_role(clan_config['CLAN_ROLE_ID']).members:
+            for member in channel.guild.get_role(clan_config["CLAN_ROLE_ID"]).members:
                 clan.add_member(member)
             # scheduler.add_job(daily_reset, 'interval', args=[channel.guild.id, channel.id], days=1, start_date=cfg.cb_start_date)
-            msg = f'{db_name}.db has been created and started.'
+            msg = f"{db_name}.db has been created and started."
             clan.drive_update()
 
-        mods_members = channel.guild.get_role(clan_config['CLAN_MOD_ROLE_ID']).members
+        mods_members = channel.guild.get_role(clan_config["CLAN_MOD_ROLE_ID"]).members
         for member in mods_members:
             if clan.find_member(member.id):
                 clan.mods.append(member.id)
         clan.is_daily_reset = False
-        scheduler.start()
         print(f'{msg[:-1]} in "{channel.guild.name}" #{channel.name}.')
         # await channel.send(msg, delete_after=5)
         clan.ui = Ui()
@@ -441,10 +477,11 @@ def daily_reset():
 #     return (msg, file, file2)
 
 
-try:
-    bot.run(cfg.TOKEN)
-except RuntimeError:
-    pass
-print('Client closed')
-while 1:
-    time.sleep(500)
+def start():
+    try:
+        bot.run(cfg.TOKEN)
+    except RuntimeError:
+        pass
+    print("Client closed")
+    while 1:
+        time.sleep(500)

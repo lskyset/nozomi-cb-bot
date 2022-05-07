@@ -1,0 +1,7 @@
+# Ignore everything
+**
+
+# ... except for dependencies and source
+!Pipfile
+!Pipfile.lock
+!nozomi_cb_bot
