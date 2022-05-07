@@ -87,6 +87,7 @@ class Cb_commands(commands.Cog, name='CB Commands'):
     """CB Commands are commands that can be used in a channel where a clan battle database has been loaded."""
     def __init__(self, bot):
         self.bot = bot
+        self.ui_update_num = 0
         self.ui_update_loop.start()
 
     async def cog_check(self, ctx):  # check the cb date
@@ -257,6 +258,8 @@ class Cb_commands(commands.Cog, name='CB Commands'):
 
     @tasks.loop(seconds=20)
     async def ui_update_loop(self):
+        print(f'INFO: UI Update loop run {self.i}')
+        self.i = self.i + 1
         for clan in clans:
             if clan.is_daily_reset:
                 clan.daily_reset()
