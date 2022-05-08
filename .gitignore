@@ -132,5 +132,4 @@ dmypy.json
 *.db
 *.csv
 *.json
-discord_token.txt
-mycreds.txt
+*.txt

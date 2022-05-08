@@ -4,6 +4,7 @@ import os
 import re
 import sqlite3
 import time
+from dataclasses import dataclass
 from itertools import zip_longest
 from operator import itemgetter
 
@@ -37,6 +38,7 @@ class Clan:
         self.google_drive_sheet = {}  # type: ignore
         self.skip_line = 0
         self.timeout_minutes = 0
+        self.overview_message_id = -1
 
         for key, val in config.items():
             setattr(self, key.lower(), val)
@@ -486,6 +488,7 @@ class Member:
     def __init__(self, discord_id: int, conn):
         self.discord_id = -1
         self.conn = conn
+        self.remaining_hits = -1
         c = self.conn.cursor()
         data = c.execute(
             f"SELECT * from members_data where discord_id = {discord_id}"
@@ -527,6 +530,7 @@ class Member:
         return boss_is_dead
 
 
+@dataclass
 class Boss:
     def __init__(self, data: dict, clan):
         self.wave = -1
@@ -534,6 +538,8 @@ class Boss:
         self.number = -1
         self.hitting_member_id = -1
         self.syncing_member_id = -1
+        self.name = ""
+        self.max_hp: list[int] = []
         self.conn = clan.conn
         c = self.conn.cursor()
         for key, val in data.items():
