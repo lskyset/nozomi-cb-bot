@@ -1,105 +1,48 @@
 import asyncio
 import datetime
 import time
+from dataclasses import dataclass, field
 
 import discord
 
 from . import config as cfg
+from . import db
 
 
-class Ui:
-    def __init__(self):
-        self.clan = None
-        self.channel = None
-        self.b1 = None
-        self.b2 = None
-        self.b3 = None
-        self.b4 = None
-        self.b5 = None
-        self.overview = None
+@dataclass
+class BossBox:
+    message: discord.MessageType
+    boss: db.Boss
+    clan: db.Clan
+    embed: discord.Embed = field(default_factory=discord.Embed)
+    wave_offset: int = 0
+    discord_hm: discord.Member = None
+    discord_sm: discord.Member = None
+    hit_button: discord.Button = discord.Button(
+        label="Hit",
+        custom_id="hit",
+        style=discord.ButtonColor.grey,
+        emoji="⚔️",
+    )
+    disabled_hit_button: discord.Button = discord.Button(
+        label="Hit",
+        custom_id="hit",
+        style=discord.ButtonColor.grey,
+        emoji="⚔️",
+        disabled="true",
+    )
+    queue_button: discord.Button = discord.Button(
+        label="Queue",
+        custom_id="queue",
+        style=discord.ButtonColor.grey,
+        emoji="🕒",
+    )
+    overview_button: discord.Button = None
 
-    async def start(self, channel, clan):
-        self.clan = clan
-        self.channel = channel
-
-        for boss in clan.bosses:
-            if boss.message_id:
-                msg = self.channel.get_partial_message(boss.message_id)
-                await msg.delete()
-            msg = await self.channel.send(f"Loading B{boss.number}...")
-            boss.message_id = msg.id
-            boss.update()
-            await asyncio.sleep(1)
-            setattr(self, f"b{boss.number}", Boss_box(msg, boss, clan))
-
-        if clan.overview_message_id:
-            msg = self.channel.get_partial_message(clan.overview_message_id)
-            await msg.delete()
-        msg = await self.channel.send("Loading overview...")
-        self.overview = Overview_box(msg, clan)
-        clan.overview_message_id = msg.id
-        clan.update()
-
-        for boss in clan.bosses:
-            getattr(self, f"b{boss.number}").overview_button = discord.Button(
-                label="Overview",
-                style=discord.ButtonColor.grey_url,
-                url=self.overview.message.jump_url,
-            )
-            setattr(
-                self.overview,
-                f"b{boss.number}_button",
-                discord.Button(
-                    label=f"B{boss.number}",
-                    style=discord.ButtonColor.grey_url,
-                    url=getattr(self, f"b{boss.number}").message.jump_url,
-                ),
-            )
-            await asyncio.sleep(0.5)
-        await self.update()
-
-    async def update(self, message_id=None):
-        for boss in self.clan.bosses:
-            if message_id is None or message_id == boss.message_id:
-                await getattr(self, f"b{boss.number}").update()
-                await asyncio.sleep(0.5)
-        await self.overview.update()
-
-
-class Boss_box:
-    def __init__(self, message, boss, clan):
-        self.message = message
-        self.boss = boss
-        self.clan = clan
-        self.embed = discord.Embed()
+    def __post_init__(self):
         self.embed.set_image(url=self.boss.img)
-        self.wave_offset = 0
 
-        self.discord_hm = None
-        self.discord_sm = None
-
-        self.hit_button = discord.Button(
-            label="Hit",
-            custom_id="hit",
-            style=discord.ButtonColor.grey,
-            emoji="⚔️",
-        )
-        self.disabled_hit_button = discord.Button(
-            label="Hit",
-            custom_id="hit",
-            style=discord.ButtonColor.grey,
-            emoji="⚔️",
-            disabled="true",
-        )
-        self.queue_button = discord.Button(
-            label="Queue",
-            custom_id="queue",
-            style=discord.ButtonColor.grey,
-            emoji="🕒",
-        )
-        self.overview_button = None
-
-    async def update(self):
+    async def update(self) -> None:
 
         self.wave_offset = self.boss.wave - self.clan.current_wave
         if self.wave_offset > 1:
@@ -116,7 +59,7 @@ class Boss_box:
             content=None, embed=self.embed, components=self.components
         )
 
-    def set_description(self):
+    def set_description(self) -> None:
         # title
         hp_text = "HP : *{:,} / {:,}* \n\n".format(
             self.boss.hp, self.boss.max_hp[self.boss.tier - 1]
@@ -191,7 +134,7 @@ class Boss_box:
         description_text = f"{hp_text}{p_damage_text}{damage_text}{queue_text}"
         self.embed.description = description_text
 
-    async def set_footer(self):
+    async def set_footer(self) -> None:
         hm_id = self.boss.hitting_member_id
         sm_id = self.boss.syncing_member_id
         if hm_id:
@@ -213,7 +156,7 @@ class Boss_box:
         else:
             self.embed.set_footer(text="")
 
-    def set_components(self):
+    def set_components(self) -> None:
         if (
             self.boss.hitting_member_id
             or self.wave_offset > 1
@@ -231,32 +174,29 @@ class Boss_box:
         ]
 
 
-class Overview_box:
-    def __init__(self, message, clan):
-        self.message = message
-        self.bosses = clan.bosses
-        self.clan = clan
-        self.embed = discord.Embed()
-        self.embed.title = "Overview"
+@dataclass
+class OverviewBox:
+    message: discord.MessageType
+    clan: db.Clan
+    embed: discord.Embed = discord.Embed(title="Overview")
+    b1_button: discord.Button = None
+    b2_button: discord.Button = None
+    b3_button: discord.Button = None
+    b4_button: discord.Button = None
+    b5_button: discord.Button = None
+    log_button = discord.Button(
+        label="Logs",
+        custom_id="logs",
+        style=discord.ButtonColor.grey,
+        emoji="📝",
+    )
 
-        self.b1_button = None
-        self.b2_button = None
-        self.b3_button = None
-        self.b4_button = None
-        self.b5_button = None
-        self.log_button = discord.Button(
-            label="Logs",
-            custom_id="logs",
-            style=discord.ButtonColor.grey,
-            emoji="📝",
-        )
-
-    async def update(self):
+    async def update(self) -> None:
         self.embed.set_author(
             name=f"Tier {self.clan.current_tier}: Wave {self.clan.current_wave}"
         )
         self.embed.clear_fields()
-        for boss in self.bosses:
+        for boss in self.clan.bosses:
             wave_offset = boss.wave - self.clan.current_wave
             self.embed.add_field(
                 name=f"Boss {boss.number} : {boss.name}",
@@ -282,3 +222,62 @@ class Overview_box:
         await self.message.edit(
             content=None, embed=self.embed, components=self.components
         )
+
+
+@dataclass(init=False)
+class Ui:
+    clan: db.Clan
+    channel: discord.ChannelType
+    b1: BossBox
+    b2: BossBox
+    b3: BossBox
+    b4: BossBox
+    b5: BossBox
+    overview: OverviewBox
+
+    async def start(self, channel: discord.ChannelType, clan: db.Clan) -> None:
+        self.clan = clan
+        self.channel = channel
+
+        for boss in self.clan.bosses:
+            if boss.message_id:
+                msg = self.channel.get_partial_message(boss.message_id)
+                await msg.delete()
+            msg = await self.channel.send(f"Loading B{boss.number}...")
+            boss.message_id = msg.id
+            boss.update()
+            await asyncio.sleep(1)
+            setattr(self, f"b{boss.number}", BossBox(msg, boss, clan))
+
+        if clan.overview_message_id:
+            msg = self.channel.get_partial_message(clan.overview_message_id)
+            await msg.delete()
+        msg = await self.channel.send("Loading overview...")
+        self.overview = OverviewBox(msg, clan)
+        clan.overview_message_id = msg.id
+        clan.update()
+
+        for boss in self.clan.bosses:
+            getattr(self, f"b{boss.number}").overview_button = discord.Button(
+                label="Overview",
+                style=discord.ButtonColor.grey_url,
+                url=self.overview.message.jump_url,
+            )
+            setattr(
+                self.overview,
+                f"b{boss.number}_button",
+                discord.Button(
+                    label=f"B{boss.number}",
+                    style=discord.ButtonColor.grey_url,
+                    url=getattr(self, f"b{boss.number}").message.jump_url,
+                ),
+            )
+            await asyncio.sleep(0.5)
+        await self.update()
+
+    async def update(self, message_id: int = None) -> None:
+        for boss in self.clan.bosses:
+            if message_id is None or message_id == boss.message_id:
+                await getattr(self, f"b{boss.number}").update()
+                await asyncio.sleep(0.5)
+        await self.overview.update()
