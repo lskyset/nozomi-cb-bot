@@ -6,14 +6,15 @@ from dataclasses import dataclass, field
 import discord
 
 from . import config as cfg
-from . import db
+from .db.boss import Boss
+from .db.clan import Clan
 
 
 @dataclass
 class BossBox:
     message: discord.MessageType
-    boss: db.Boss
-    clan: db.Clan
+    boss: Boss
+    clan: Clan
     embed: discord.Embed = field(default_factory=discord.Embed)
     wave_offset: int = 0
     discord_hm: discord.Member = None
@@ -177,7 +178,7 @@ class BossBox:
 @dataclass
 class OverviewBox:
     message: discord.MessageType
-    clan: db.Clan
+    clan: Clan
     embed: discord.Embed = discord.Embed(title="Overview")
     b1_button: discord.Button = None
     b2_button: discord.Button = None
@@ -226,7 +227,7 @@ class OverviewBox:
 
 @dataclass(init=False)
 class Ui:
-    clan: db.Clan
+    clan: Clan
     channel: discord.ChannelType
     b1: BossBox
     b2: BossBox
@@ -235,7 +236,7 @@ class Ui:
     b5: BossBox
     overview: OverviewBox
 
-    async def start(self, channel: discord.ChannelType, clan: db.Clan) -> None:
+    async def start(self, channel: discord.ChannelType, clan: Clan) -> None:
         self.clan = clan
         self.channel = channel
 

@@ -24,6 +24,7 @@ pytest = "*"
 pytest-cov = "*"
 click = "==8.0.1"
 types-pytz = "*"
+pytest-mock = "*"
 
 [pipenv]
 allow_prereleases = true

@@ -2,16 +2,22 @@ import os
 import time
 
 import discord
+import gspread
 from discord.ext import commands
+from oauth2client.service_account import ServiceAccountCredentials
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 from . import config as cfg
-from . import db
 from . import emoji as e
 from .commands.clanbattle import Cb_commands
 from .commands.global_commands import Global_commands
 from .commands.mod import Mod_commands
 from .commands.util import find_clan
 from .config import PREFIX as P
+from .db.clan import Clan
+from .db.db_helper import create_cb_db
+from .db.util import download_db
 from .ui import Ui
 
 intents = discord.Intents.default()
@@ -25,6 +31,20 @@ bot = commands.Bot(
 )
 bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category="Other")
 bot.clans = []
+
+
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive",
+]
+creds = ServiceAccountCredentials.from_json_keyfile_name(
+    "nozomi-bot-19331373ee16.json", scope
+)
+gc = gspread.authorize(creds)
+
+gauth = GoogleAuth()
+gauth.LoadCredentialsFile("mycreds.txt")
+drive = GoogleDrive(gauth)
 
 
 @bot.event
@@ -88,14 +108,14 @@ async def cb_init(channel, db_name, clan_config):
 
 def setup_database(path, db_name, clan_config, channel):
     clan = None
-    if os.path.isfile(path) or (not cfg.DISABLE_DRIVE and db.download_db(path)):
+    if os.path.isfile(path) or (not cfg.DISABLE_DRIVE and download_db(path, drive)):
         msg = f"{db_name}.db has been started."
         print_database_message(msg, channel)
-        clan = db.Clan(db_name, clan_config)
+        clan = Clan(db_name, clan_config, drive, gc)
         bot.clans.append(clan)
     else:
-        db.create_cb_db(db_name, channel.guild.id, channel.id)
-        clan = db.Clan(db_name, clan_config)
+        create_cb_db(db_name, channel.guild.id, channel.id)
+        clan = Clan(db_name, clan_config, drive, gc)
         bot.clans.append(clan)
         for member in channel.guild.get_role(clan_config["CLAN_ROLE_ID"]).members:
             clan.add_member(member)
