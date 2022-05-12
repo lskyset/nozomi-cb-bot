@@ -1,5 +1,4 @@
 import os
-import time
 
 import discord
 import gspread
@@ -142,10 +141,6 @@ def print_database_message(msg, channel):
 
 
 def start():
-    try:
-        bot.run(bot_config.DISCORD_TOKEN)
-    except RuntimeError:
-        pass
-    print("Client closed")
-    while 1:
-        time.sleep(500)
+    if not bot_config.DISCORD_TOKEN:
+        return
+    bot.run(bot_config.DISCORD_TOKEN)
