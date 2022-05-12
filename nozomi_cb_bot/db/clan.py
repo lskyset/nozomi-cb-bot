@@ -1,44 +1,27 @@
-import csv
 import math
-import os
 import re
 import sqlite3
 import time
-from dataclasses import dataclass
-from itertools import zip_longest
-from operator import itemgetter
+import typing
 
-import gspread
 import pytz
-from oauth2client.service_account import ServiceAccountCredentials
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
 
-from . import config as cfg
-from . import emoji as e
-from .config import PREFIX as P
-
-if not cfg.DISABLE_DRIVE:
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        "nozomi-bot-19331373ee16.json", scope
-    )
-    gc = gspread.authorize(creds)
-
-    gauth = GoogleAuth()
-    gauth.LoadCredentialsFile("mycreds.txt")
-    drive = GoogleDrive(gauth)
+from .. import config as cfg
+from .. import emoji as e
+from ..config import PREFIX as P
+from ..db.boss import Boss
+from ..db.member import Member
+from .util import replace_num, update_db
 
 
 class Clan:
-    def __init__(self, db_name: str, config: dict):
+    def __init__(self, db_name: str, config: dict, drive: typing.Any, gc: typing.Any):
         self.google_drive_sheet = {}  # type: ignore
         self.skip_line = 0
         self.timeout_minutes = 0
         self.overview_message_id = -1
+        self.drive = drive
+        self.gc = gc
 
         for key, val in config.items():
             setattr(self, key.lower(), val)
@@ -100,7 +83,7 @@ class Clan:
         self.drive_loading = True
         self.full_update()
         if not cfg.DISABLE_DRIVE:
-            update_db(self)
+            update_db(self.drive, self)
         self.drive_loading = False
 
     async def hitting(self, member_id: int, message, *args):
@@ -172,7 +155,7 @@ class Clan:
         boss.update()
         return True
 
-    def cancel_hit(self, member_id: int, message):
+    def cancel_hit(self, member_id: int):
         member = self.find_member(member_id)
         if not member:
             return False
@@ -360,15 +343,6 @@ class Clan:
         )
         c.execute("INSERT INTO damage_log VALUES (?,?,?,?,?,?,?,?)", data)
 
-    # def revive_boss(self, hp):
-    #     self.boss_num -= 1
-    #     self.current_boss_num = 1 + (self.boss_num - 1) % 5
-    #     self.current_boss = self.bosses[self.current_boss_num - 1]
-    #     self.current_wave = 1 + (self.boss_num - 1) // 5
-    #     self.current_tier = 1 + cfg.tier_threshold.index(max([i for i in cfg.tier_threshold if self.current_wave >= i]))
-    #     self.current_boss.hp = min(1000000 * self.current_boss.max_hp[self.current_tier - 1], hp)
-    #     self.undo_hit(revive=True)
-
     def find_last_damage_log(self, member_id: int):
         c = self.conn.cursor()
         logs = c.execute(
@@ -482,404 +456,3 @@ class Clan:
             c = self.conn.cursor()
             c.execute("INSERT INTO chat_log VALUES (?,?,?)", log)
             self.conn.commit()
-
-
-class Member:
-    def __init__(self, discord_id: int, conn):
-        self.discord_id = -1
-        self.conn = conn
-        self.remaining_hits = -1
-        c = self.conn.cursor()
-        data = c.execute(
-            f"SELECT * from members_data where discord_id = {discord_id}"
-        ).fetchone()
-        if data:
-            columns = c.execute("PRAGMA table_info(members_data)").fetchall()
-            for column in columns:
-                if data[column[0]] is not None:
-                    setattr(self, column[1], data[column[0]])
-            self.role_cd = cfg.jst_time()
-
-    def update(self):
-        c = self.conn.cursor()
-        for key, val in self.__dict__.items():
-            try:
-                c.execute(
-                    f"UPDATE members_data SET {key} = ? WHERE discord_id = ?",
-                    (val, self.discord_id),
-                )
-            except sqlite3.OperationalError:
-                pass
-        self.conn.commit()
-
-    def deal_damage(self, damage, boss):
-        boss_is_dead = boss.recieve_damage(damage, self.discord_id)
-        setattr(self, f"b{boss.number}_hits", getattr(self, f"b{boss.number}_hits") + 1)
-        if self.of_status:
-            self.of_number -= 1
-            if self.of_number < 0:
-                self.of_number = 0
-            self.of_status = False
-        else:
-            self.remaining_hits -= 1
-            if boss_is_dead:
-                self.of_number += 1
-        self.hitting_boss_number = 0
-        self.total_hits += 1
-        self.update()
-        return boss_is_dead
-
-
-@dataclass
-class Boss:
-    def __init__(self, data: dict, clan):
-        self.wave = -1
-        self.message_id = -1
-        self.number = -1
-        self.hitting_member_id = -1
-        self.syncing_member_id = -1
-        self.name = ""
-        self.max_hp: list[int] = []
-        self.conn = clan.conn
-        c = self.conn.cursor()
-        for key, val in data.items():
-            setattr(self, key, val)
-        boss_data = c.execute(
-            f"SELECT * from boss_data where number = {self.number}"
-        ).fetchone()
-        if boss_data:
-            boss_columns = c.execute("PRAGMA table_info(boss_data)").fetchall()
-            for boss_column in boss_columns:
-                if boss_data[boss_column[0]] is not None:
-                    setattr(self, boss_column[1], boss_data[boss_column[0]])
-
-        self.tier = 1 + cfg.tier_threshold.index(
-            max([i for i in cfg.tier_threshold if self.wave >= i])
-        )
-        self.queue_timeout = cfg.jst_time(minutes=clan.timeout_minutes)
-
-    def update(self):
-        c = self.conn.cursor()
-        for key, val in self.__dict__.items():
-            try:
-                c.execute(
-                    f"UPDATE boss_data SET {key} = ? WHERE number = ?",
-                    (val, self.number),
-                )
-            except sqlite3.OperationalError:
-                pass
-        self.conn.commit()
-
-    def recieve_damage(self, damage: int, member_id: int):
-        if self.hitting_member_id == member_id:  # reset hitter
-            self.hitting_member_id = 0
-        elif self.syncing_member_id == member_id:  # reset syncer
-            self.syncing_member_id = 0
-        if (
-            self.hitting_member_id == 0 and self.syncing_member_id > 0
-        ):  # reset hitter -> syncer becomes hitter
-            self.hitting_member_id = self.syncing_member_id
-            self.syncing_member_id = 0
-        self.hp -= damage
-        if self.hp <= 0:
-            self.next()
-            return True
-        self.update()
-        return False
-
-    def next(self):
-        self.wave += 1
-        self.tier = 1 + cfg.tier_threshold.index(
-            max([i for i in cfg.tier_threshold if self.wave >= i])
-        )
-        self.hp = self.max_hp[self.tier - 1]
-        self.update()
-
-    def get_damage_log(self, wave_offset=0):
-        c = self.conn.cursor()
-        data = c.execute(
-            f"SELECT * from damage_log WHERE boss_number = {self.number} AND boss_wave = {self.wave + wave_offset} ORDER BY timestamp"
-        ).fetchall()
-        if not data:
-            return None
-        hits = []
-        columns = c.execute("PRAGMA table_info(damage_log)").fetchall()
-        for hit in data:
-            hit_dict = {}
-            for column in columns:
-                if hit[column[0]] is not None:
-                    hit_dict[column[1]] = hit[column[0]]
-            hits.append(hit_dict)
-        return hits
-
-    def get_queue(self):
-        c = self.conn.cursor()
-        data = c.execute(
-            f"SELECT * from queue WHERE boss_number = {self.number} and wave = {self.wave}"
-        ).fetchall()
-        data += c.execute(
-            f"SELECT * from queue WHERE boss_number = {self.number} and wave < {self.wave}"
-        ).fetchall()
-        if not data:
-            return None
-        queue = []
-        columns = c.execute("PRAGMA table_info(queue)").fetchall()
-        for member in data:
-            member_dict = {}
-            for column in columns:
-                if member[column[0]] is not None:
-                    member_dict[column[1]] = member[column[0]]
-            queue.append(member_dict)
-        return queue
-
-    def get_waiting(self):
-        c = self.conn.cursor()
-        data = c.execute(
-            f"SELECT * from queue WHERE boss_number = {self.number} and wave > {self.wave} ORDER BY wave"
-        ).fetchall()
-        if not data:
-            return None
-        queue = []
-        columns = c.execute("PRAGMA table_info(queue)").fetchall()
-        for member in data:
-            member_dict = {}
-            for column in columns:
-                if member[column[0]] is not None:
-                    member_dict[column[1]] = member[column[0]]
-            queue.append(member_dict)
-        return queue
-
-    def get_first_in_queue_id(self):
-        queue = self.get_queue()
-        if not queue:
-            return None
-        return int(queue[0]["member_id"])
-
-
-def replace_num(num):
-    if num[-1] in ["k", "m"]:
-        return int(float(num[:-1]) * 10 ** (3 + 3 * (num[-1] == "m")))
-    return int(float(num))
-
-
-def create_cb_db(name, guild_id, channel_id):
-    conn = sqlite3.connect(f"{name}.db")
-    c = conn.cursor()
-    c.execute(
-        """CREATE TABLE cb_data
-                (name text,
-                guild_id int,
-                channel_id int,
-                overview_message_id int,
-                d1_dmg int,
-                d2_dmg int ,
-                d3_dmg int,
-                d4_dmg int,
-                d5_dmg int,
-                rush_hour boolean)"""
-    )
-    c.execute(
-        "INSERT INTO cb_data VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, False)",
-        (name, guild_id, channel_id),
-    )
-
-    c.execute(
-        """CREATE TABLE members_data
-                (discord_id int,
-                name text,
-                remaining_hits int,
-                total_hits int,
-                b1_hits int,
-                b2_hits int,
-                b3_hits int,
-                b4_hits int,
-                b5_hits int,
-                hitting_boss_number int,
-                of_status boolean,
-                of_number int,
-                missed_hits int)"""
-    )
-
-    c.execute(
-        """CREATE TABLE boss_data
-                (number int,
-                wave int,
-                hp int,
-                message_id int,
-                hitting_member_id int,
-                syncing_member_id int)"""
-    )
-    for boss in cfg.boss_data:
-        data = (boss["number"], boss["wave"], boss["hp"])
-        c.execute("INSERT INTO boss_data VALUES (?,?,?,0,0,0)", data)
-
-    c.execute(
-        """CREATE TABLE chat_log
-                (date_jst text,
-                name text,
-                message text)"""
-    )
-
-    c.execute(
-        """CREATE TABLE damage_log
-                (boss_number int,
-                boss_wave int,
-                member_id int,
-                member_name text,
-                damage int,
-                overflow bool,
-                dead bool,
-                timestamp int)"""
-    )
-
-    c.execute(
-        """CREATE TABLE queue
-                (boss_number int,
-                member_id int,
-                member_name text,
-                pinged bool,
-                note text,
-                timestamp int,
-                wave int)"""
-    )
-
-    c.execute(
-        """CREATE TABLE missed_hits_data
-                (discord_id int,
-                name text,
-                total_missed_hits int,
-                total_missed_of int,
-                d1_missed_hits int,
-                d2_missed_hits int,
-                d3_missed_hits int,
-                d4_missed_hits int,
-                d5_missed_hits int,
-                d1_missed_of int,
-                d2_missed_of int,
-                d3_missed_of int,
-                d4_missed_of int,
-                d5_missed_of int)"""
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_csv_table_data(table, c, r=False):
-    row_name = [
-        itemgetter(1)(col)
-        for col in c.execute(f"PRAGMA table_info({table})").fetchall()
-    ]
-    data = None
-    if r:
-        data = [row_name] + list(
-            reversed(c.execute(f"SELECT * from {table}").fetchall())
-        )
-    else:
-        data = [row_name] + c.execute(f"SELECT * from {table}").fetchall()
-    return data
-
-
-def data_csv(name):
-    conn = sqlite3.connect(f"{name}.db")
-    c = conn.cursor()
-    table_list = ["members_data"]
-    path = f"{name}_data.csv"
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        for table in table_list:
-            writer.writerows(get_csv_table_data(table, c))
-            writer.writerow("")
-        writer.writerow(
-            ["Last updated at", cfg.jst_time().strftime("%m/%d/%Y %H:%M:%S"), "JST"]
-        )
-    return path
-
-
-def chat_log_csv(name):
-    conn = sqlite3.connect(f"{name}.db")
-    c = conn.cursor()
-    path = name + "_chat_log.csv"
-    chat_logs = get_csv_table_data("chat_log", c, r=True)
-    damage_logs = get_csv_table_data("damage_log", c, r=True)
-    data = []
-    for a, b in list(zip_longest(chat_logs, damage_logs, fillvalue="")):
-        data.append([*a, "", *b])
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerows(data)
-    return path
-
-
-def togspread(path, ws, gs_sheet):
-    content = []
-    with open(path, newline="", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            content.append(row)
-    ws.clear()
-    gs_sheet.values_update(
-        ws.title, params={"valueInputOption": "USER_ENTERED"}, body={"values": content}
-    )
-
-
-def upload_db(path):
-    folderName = "cb-database"
-    folders = drive.ListFile(
-        {
-            "q": f"title='{folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        }
-    ).GetList()
-    for folder in folders:
-        if folder["title"] == folderName:
-            file_list = drive.ListFile(
-                {"q": "'{}' in parents and trashed=false".format(folder["id"])}
-            ).GetList()
-            file = None
-            for drive_file in file_list:
-                if drive_file["title"] == path:
-                    file = drive_file
-                    break
-            if not file:
-                file = drive.CreateFile({"parents": [{"id": folder["id"]}]})
-            file.SetContentFile(path)
-            file.Upload()
-            return True
-    return False
-
-
-def download_db(name):
-    folderName = "cb-database"
-    folders = drive.ListFile(
-        {
-            "q": "title='"
-            + folderName
-            + "' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        }
-    ).GetList()
-    for folder in folders:
-        if folder["title"] == folderName:
-            file_list = drive.ListFile(
-                {"q": "'{}' in parents and trashed=false".format(folder["id"])}
-            ).GetList()
-            for file in file_list:
-                if file["title"] == name:
-                    file.GetContentFile(name)
-                    return True
-    return False
-
-
-def update_db(clan):
-    data_path = data_csv(clan.name)
-    chat_log_path = chat_log_csv(clan.name)
-    togspread(data_path, clan.gs_db, clan.gs_sheet)
-    togspread(chat_log_path, clan.gs_chat_log, clan.gs_sheet)
-    upload_db(f"{clan.name}.db")
-    os.remove(data_path)
-    os.remove(chat_log_path)
-
-
-if __name__ == "__main__":
-    pass
-    # conn = sqlite3.connect('test_private_dev.db')
-    # c = conn.cursor()
-    # a = c.execute('select * from cb_data')
