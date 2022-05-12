@@ -1,23 +1,24 @@
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 
 from .. import config as cfg
+from ..config import CB_DATA
 
 
 @dataclass
 class Boss:
-    def __init__(self, data: dict, clan):
+    def __init__(self, data: cfg.BossData, clan):
         self.wave = -1
         self.message_id = -1
-        self.number = -1
+        self.number = data.NUMBER
         self.hitting_member_id = -1
         self.syncing_member_id = -1
-        self.name = ""
-        self.max_hp: list[int] = []
+        self.name = data.NAME
+        self.max_hp: list[int] = data.MAX_HP_LIST
+        self.img = data.IMG_URL
         self.conn = clan.conn
         c = self.conn.cursor()
-        for key, val in data.items():
-            setattr(self, key, val)
         boss_data = c.execute(
             f"SELECT * from boss_data where number = {self.number}"
         ).fetchone()
@@ -27,10 +28,10 @@ class Boss:
                 if boss_data[boss_column[0]] is not None:
                     setattr(self, boss_column[1], boss_data[boss_column[0]])
 
-        self.tier = 1 + cfg.tier_threshold.index(
-            max([i for i in cfg.tier_threshold if self.wave >= i])
+        self.tier = 1 + CB_DATA.TIER_THRESHOLD.index(
+            max([i for i in CB_DATA.TIER_THRESHOLD if self.wave >= i])
         )
-        self.queue_timeout = cfg.jst_time(minutes=clan.timeout_minutes)
+        self.queue_timeout: datetime | None = cfg.jst_time(minutes=clan.timeout_minutes)
 
     def update(self):
         c = self.conn.cursor()
@@ -63,8 +64,8 @@ class Boss:
 
     def next(self):
         self.wave += 1
-        self.tier = 1 + cfg.tier_threshold.index(
-            max([i for i in cfg.tier_threshold if self.wave >= i])
+        self.tier = 1 + CB_DATA.TIER_THRESHOLD.index(
+            max([i for i in CB_DATA.TIER_THRESHOLD if self.wave >= i])
         )
         self.hp = self.max_hp[self.tier - 1]
         self.update()

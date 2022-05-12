@@ -1,5 +1,4 @@
 import os
-import time
 
 import discord
 import gspread
@@ -8,23 +7,23 @@ from oauth2client.service_account import ServiceAccountCredentials
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
-from . import config as cfg
 from . import emoji as e
 from .commands.clanbattle import Cb_commands
 from .commands.global_commands import Global_commands
 from .commands.mod import Mod_commands
 from .commands.util import find_clan
-from .config import PREFIX as P
+from .config import BotConfig
 from .db.clan import Clan
 from .db.db_helper import create_cb_db
 from .db.util import download_db
 from .ui import Ui
 
+bot_config = BotConfig()
 intents = discord.Intents.default()
 intents.members = True
 
 bot = commands.Bot(
-    command_prefix=P,
+    command_prefix=bot_config.PREFIX,
     description="List of commands : (Under construction)",
     intents=intents,
     case_insensitive=True,
@@ -33,25 +32,28 @@ bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category="Other"
 bot.clans = []
 
 
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "nozomi-bot-19331373ee16.json", scope
-)
-gc = gspread.authorize(creds)
+gc = None
+drive = None
+if not bot_config.DISABLE_DRIVE:
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "nozomi-bot-19331373ee16.json", scope
+    )
+    gc = gspread.authorize(creds)
 
-gauth = GoogleAuth()
-gauth.LoadCredentialsFile("mycreds.txt")
-drive = GoogleDrive(gauth)
+    gauth = GoogleAuth()
+    gauth.LoadCredentialsFile("mycreds.txt")
+    drive = GoogleDrive(gauth)
 
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}.\n")
-    for cfg_clan_name, cfg_clan_data in cfg.CLANS.items():
-        if cfg_clan_data["ENV"] == cfg.ENV and cfg_clan_name != "default":
+    for cfg_clan_name, cfg_clan_data in bot_config.CLANS.items():
+        if cfg_clan_data["ENV"] == bot_config.BOT_ENV and cfg_clan_name != "default":
             channel = bot.get_channel(cfg_clan_data["CHANNEL_ID"])
             await cb_init(channel, cfg_clan_name, cfg_clan_data)
 
@@ -84,7 +86,7 @@ async def on_command_error(ctx, error):
         await ctx.message.add_reaction(e.cross)
     elif isinstance(error, ignore_errors):
         return
-    elif cfg.ENV > 0:
+    elif bot_config.BOT_ENV > 0:
         raise error
 
 
@@ -94,7 +96,7 @@ bot.add_cog(Mod_commands(bot))
 
 
 async def cb_init(channel, db_name, clan_config):
-    if cfg.ENV > 0:
+    if bot_config.BOT_ENV > 0:
         db_name += "_dev"
     path = f"{db_name}.db"
     clan = setup_database(path, db_name, clan_config, channel)
@@ -108,7 +110,9 @@ async def cb_init(channel, db_name, clan_config):
 
 def setup_database(path, db_name, clan_config, channel):
     clan = None
-    if os.path.isfile(path) or (not cfg.DISABLE_DRIVE and download_db(path, drive)):
+    if os.path.isfile(path) or (
+        not bot_config.DISABLE_DRIVE and download_db(path, drive)
+    ):
         msg = f"{db_name}.db has been started."
         print_database_message(msg, channel)
         clan = Clan(db_name, clan_config, drive, gc)
@@ -137,10 +141,6 @@ def print_database_message(msg, channel):
 
 
 def start():
-    try:
-        bot.run(cfg.TOKEN)
-    except RuntimeError:
-        pass
-    print("Client closed")
-    while 1:
-        time.sleep(500)
+    if not bot_config.DISCORD_TOKEN:
+        return
+    bot.run(bot_config.DISCORD_TOKEN)

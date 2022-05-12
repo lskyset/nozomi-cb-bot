@@ -1,8 +1,10 @@
 from discord.ext import commands
 
 from .. import emoji as e
-from ..config import PREFIX as P
+from ..config import BotConfig
 from .util import find_clan
+
+P = BotConfig().PREFIX
 
 
 class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
