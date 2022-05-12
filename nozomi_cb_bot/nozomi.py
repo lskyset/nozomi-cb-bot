@@ -33,18 +33,21 @@ bot.help_command = commands.DefaultHelpCommand(dm_help=True, no_category="Other"
 bot.clans = []
 
 
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "nozomi-bot-19331373ee16.json", scope
-)
-gc = gspread.authorize(creds)
+gc = None
+drive = None
+if not bot_config.DISABLE_DRIVE:
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "nozomi-bot-19331373ee16.json", scope
+    )
+    gc = gspread.authorize(creds)
 
-gauth = GoogleAuth()
-gauth.LoadCredentialsFile("mycreds.txt")
-drive = GoogleDrive(gauth)
+    gauth = GoogleAuth()
+    gauth.LoadCredentialsFile("mycreds.txt")
+    drive = GoogleDrive(gauth)
 
 
 @bot.event
