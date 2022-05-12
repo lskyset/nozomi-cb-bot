@@ -2,8 +2,10 @@ from discord.ext import commands, tasks
 
 from .. import config as cfg
 from .. import emoji as e
-from ..config import PREFIX as P
+from ..config import CB_DATA, BotConfig
 from .util import find_clan
+
+P = BotConfig().PREFIX
 
 
 class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
@@ -177,7 +179,7 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.member)
     async def done(self, ctx, *args):
         """ """
-        if (cfg.jst_time() - cfg.cb_start_date).total_seconds() < 0:
+        if (cfg.jst_time() - CB_DATA.START_DATE).total_seconds() < 0:
             await ctx.send(
                 f"CB hasn't started yet {ctx.author.mention}", delete_after=5
             )
@@ -205,7 +207,7 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
             boss = clan.undo(ctx.message)
             if boss:
                 await ctx.message.add_reaction(e.ok)
-            await clan.ui.update(boss.message_id)
+                await clan.ui.update(boss.message_id)
 
     @tasks.loop(seconds=20)
     async def ui_update_loop(self):

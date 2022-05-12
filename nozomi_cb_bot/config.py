@@ -1,49 +1,118 @@
-import datetime
 import json
 import os
 import sqlite3
 import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 import pytz
+from dotenv import load_dotenv
 
-discord_token_file_name = "discord_token.txt"
-if os.path.isfile(discord_token_file_name):
-    with open(discord_token_file_name, "r") as fd:
-        TOKEN = fd.readline()
-else:
-    print(f"Error: {discord_token_file_name} not found")
-    exit()
-PREFIX = "!"
-ENV = 1  # change this to 0 for prod
-DISABLE_DRIVE = True
-
-default_params = {
-    "ENV": ENV,
-    "GUILD_ID": 0,
-    "CHANNEL_ID": 0,
-    "CLAN_ROLE_ID": 0,
-    "CLAN_MOD_ROLE_ID": 0,
-    "GOOGLE_DRIVE_SHEET": 0,
-    "TIMEOUT_MINUTES": 15,  # zero is infinite timeout
-    "SKIP_LINE": 0,  # 1 disables the restrictions on the queue making it only a visual indicator of intent
-}
+load_dotenv(override=True)
 
 
-def jst_time(minutes=0, seconds=0):
-    utc_now = datetime.datetime.now(tz=pytz.timezone("UTC"))
-    jst_now = utc_now.astimezone(pytz.timezone("Japan"))
-    return jst_now + datetime.timedelta(minutes=minutes, seconds=seconds)
+# @dataclass(frozen=True) # new
+@dataclass()  # temp
+class BotConfig:
+    PREFIX: str = os.getenv("PREFIX") or "!"
+    DEFAULT_BOT_ENV: int = int(os.getenv("DEFAULT_BOT_ENV") or 0)
+    BOT_ENV: int = int(os.getenv("BOT_ENV") or 0)
+    DISCORD_TOKEN: str | None = os.getenv("DISCORD_TOKEN")
+
+    # temp
+    DISABLE_DRIVE: bool = True
+
+    # temp
+    def __post_init__(self) -> None:
+        default_params = {
+            "ENV": BotConfig.BOT_ENV,
+            "GUILD_ID": 0,
+            "CHANNEL_ID": 0,
+            "CLAN_ROLE_ID": 0,
+            "CLAN_MOD_ROLE_ID": 0,
+            "GOOGLE_DRIVE_SHEET": 0,
+            "TIMEOUT_MINUTES": 15,  # zero is infinite timeout
+            "SKIP_LINE": 0,  # 1 disables the restrictions on the queue making it only a visual indicator of intent
+        }
+        if os.path.isfile("clans_config.json"):
+            with open("clans_config.json", "r") as clans_cfg:
+                clan_dict = json.load(clans_cfg)
+                clan_dict.setdefault("default", default_params)
+                for name, data in clan_dict.items():
+                    clan_dict[name] = {**default_params, **data}
+        else:
+            print("clans_config.json not found")
+            clan_dict = {"default": default_params}
+            with open("clans_config.json", "w") as fd:
+                fd.write(json.dumps(clan_dict, indent=4))
+                print("a default clans_config.json was created")
+        self.CLANS = clan_dict
 
 
-def get_tier_treshold(cb_id: int):
-    conn = sqlite3.connect("master.db")
-    c = conn.cursor()
-    data = c.execute(
+@dataclass(frozen=True)
+class GoogleDriveConfig:
+    """Represents a `GoogleDriveDatabase` configuration inside a `ClanConfig` configuration class."""
+
+    SHEET_KEY: str
+    CHAT_LOG_WORKSHEET_NAME: str
+    DATA_WORKSHEET_NAME: str
+
+
+@dataclass
+class ClanConfig:
+    """Represents a `Clan` configuration."""
+
+    name: str
+    GUILD_ID: int
+    CHANNEL_ID: int
+    CLAN_ROLE_ID: int
+    CLAN_MOD_ROLE_ID: int
+    CLAN_ENV: int = BotConfig.DEFAULT_BOT_ENV
+    timeout_minutes: int = 15
+    skip_line: int = 0
+    GOOGLE_DRIVE_CONFIG: GoogleDriveConfig | dict | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.GOOGLE_DRIVE_CONFIG) is dict:
+            self.GOOGLE_DRIVE_CONFIG = GoogleDriveConfig(**self.GOOGLE_DRIVE_CONFIG)
+
+
+@dataclass(frozen=True)
+class BossData:
+    """Represents a basic boss data extracted from priconne's master.db file."""
+
+    NAME: str
+    NUMBER: int
+    IMG_URL: str
+    MAX_HP_LIST: list[int]
+
+
+@dataclass(frozen=True)
+class PricoCbData:
+    """Represents a basic clan battle data extracted from priconne's master.db file."""
+
+    CB_ID: int
+    TIER_THRESHOLD: list[int]
+    START_DATE: datetime
+    END_DATE: datetime
+    BOSSES_DATA: list[BossData]
+
+
+_DB_URL = "https://github.com/lskyset/nozomi-cb-data/raw/main/master.db"
+_DB_NAME = "master.db"
+urllib.request.urlretrieve(_DB_URL, _DB_NAME)
+
+_conn = sqlite3.connect(_DB_NAME)
+_c = _conn.cursor()
+
+
+def _get_tier_treshold(cb_id: int) -> list[int]:
+    data = _c.execute(
         f"SELECT phase from clan_battle_2_map_data where clan_battle_id={cb_id}"
     ).fetchall()
-    tier_threshold = []
+    tier_threshold: list[int] = []
     for (tier,) in set(data):
-        (threshold,) = c.execute(
+        (threshold,) = _c.execute(
             f"SELECT lap_num_from from clan_battle_2_map_data where clan_battle_id={cb_id} and phase={tier}"
         ).fetchall()[0]
         tier_threshold.append(threshold)
@@ -51,100 +120,66 @@ def get_tier_treshold(cb_id: int):
     return tier_threshold
 
 
-def get_boss_data(cb_id: int, tier_threshold: list):
-    conn = sqlite3.connect("master.db")
-    c = conn.cursor()
-    boss_data = {}  # type: ignore
+def _get_bosses_data(cb_id: int, tier_threshold: list[int]) -> list[BossData]:
+    boss_list: list[BossData] = []
     for lap_num in tier_threshold:
-        phase, *tier_data = c.execute(
+        phase, *tier_data = _c.execute(
             f"SELECT phase, wave_group_id_1, wave_group_id_2, wave_group_id_3, wave_group_id_4, wave_group_id_5  from clan_battle_2_map_data where clan_battle_id={cb_id} and lap_num_from={lap_num}"
         ).fetchone()
-        boss_data[f"t{phase}"] = []
         boss_num = 1
-
         for wave_id in tier_data:
-            boss_dict = {}
-            (boss_id,) = c.execute(
+            boss_id = _c.execute(
                 f"SELECT enemy_id_1 from wave_group_data where wave_group_id = {wave_id}"
-            ).fetchone()
-            unit_id, name, hp, p_def, m_def = c.execute(
-                f"SELECT unit_id, name, hp, def, magic_def from enemy_parameter where enemy_id = {boss_id}"
-            ).fetchone()
-            boss_dict["name"] = name
-            boss_dict["number"] = boss_num
-            boss_dict["wave"] = 1
-            boss_dict["img"] = f"https://redive.estertion.win/icon/unit/{unit_id}.webp"
-            boss_dict["hp"] = hp
-            boss_dict["max_hp"] = hp
-            boss_dict["p.def"] = p_def
-            boss_dict["m.def"] = m_def
-            boss_data[f"t{phase}"].append(boss_dict)
+            ).fetchone()[0]
+            if phase == 1:
+                unit_id, name, max_hp = _c.execute(
+                    f"SELECT unit_id, name, hp from enemy_parameter where enemy_id = {boss_id}"
+                ).fetchone()
+                boss_list.append(
+                    BossData(
+                        NAME=name,
+                        NUMBER=boss_num,
+                        IMG_URL=f"https://redive.estertion.win/icon/unit/{unit_id}.webp",
+                        MAX_HP_LIST=[max_hp],
+                    )
+                )
+            else:
+                max_hp = _c.execute(
+                    f"SELECT hp from enemy_parameter where enemy_id = {boss_id}"
+                ).fetchone()[0]
+                boss_list[boss_num - 1].MAX_HP_LIST.append(max_hp)
             boss_num += 1
-    return boss_data
+    return boss_list
 
 
-def get_prico_db_data():
-    conn = sqlite3.connect("master.db")
-    c = conn.cursor()
-    data = {}
-    data["cb_id"], data["cb_start_date"], data["cb_end_date"] = c.execute(
-        "SELECT clan_battle_id, start_time, end_time from clan_battle_period"
-    ).fetchall()[-1]
-    data["tier_threshold"] = get_tier_treshold(data["cb_id"])
-    data["boss_data"] = get_boss_data(data["cb_id"], data["tier_threshold"])
-    return data
+def jst_time(minutes: int = 0, seconds: int = 0) -> datetime:
+    utc_now = datetime.now(tz=pytz.timezone("UTC"))
+    jst_now = utc_now.astimezone(pytz.timezone("Japan"))
+    return jst_now + timedelta(minutes=minutes, seconds=seconds)
 
 
-def get_cb_data():
-    urllib.request.urlretrieve(
-        "https://github.com/lskyset/nozomi-cb-data/raw/main/master.db", "master.db"
-    )
-    data = get_prico_db_data()
-    return data
+_CB_ID, _DB_START_DATE, _DB_END_DATE = _c.execute(
+    "SELECT clan_battle_id, start_time, end_time from clan_battle_period"
+).fetchall()[-1]
+_CB_TIER_THRESHOLD = _get_tier_treshold(_CB_ID)
+_CB_BOSSES = _get_bosses_data(_CB_ID, _CB_TIER_THRESHOLD)
 
-
-def load_clans(clans_cgf_file_name):
-    if os.path.isfile(clans_cgf_file_name):
-        with open("clans_config.json", "r") as clans_cfg:
-            clan_dict = json.load(clans_cfg)
-            clan_dict.setdefault("default", default_params)
-            for name, data in clan_dict.items():
-                clan_dict[name] = {**default_params, **data}
-            return clan_dict
-    else:
-        print(f"{clans_cgf_file_name} not found")
-        clan_dict = {"default": default_params}
-        with open(clans_cgf_file_name, "w") as fd:
-            fd.write(json.dumps(clan_dict, indent=4))
-            print(f"a default {clans_cgf_file_name} was created")
-        return clan_dict
-
-
-CLANS = load_clans("clans_config.json")
-data = get_cb_data()
-tier_threshold = data["tier_threshold"]
-full_boss_data = data["boss_data"]
-boss_data = full_boss_data["t1"]
-for boss in boss_data:
-    boss["max_hp"] = [boss["max_hp"]]
-    for i in range(1, len(tier_threshold)):
-        boss["max_hp"].append(full_boss_data[f"t{i + 1}"][boss["number"] - 1]["max_hp"])
-
-if ENV:
-    boss_data = boss_data[
-        :5
-    ]  # number of bosses to load from 1 to 5 (used for faster startup)
-    cb_start_date = jst_time()
-    cb_end_date = cb_start_date + datetime.timedelta(
-        minutes=(60 * 24 * 4 + 60 * 19 - 1)
-    )
+if BotConfig().BOT_ENV:
+    _CB_START_DATE = jst_time()
+    _CB_END_DATE = jst_time(minutes=(60 * 24 * 4 + 60 * 19 - 1), seconds=59)
 else:
-    cb_start_date = data["cb_start_date"]
-    cb_end_date = data["cb_end_date"]
     tz = pytz.timezone("Japan")
-    cb_start_date = datetime.datetime.strptime(
-        cb_start_date, "%Y/%m/%d %H:%M:%S"
-    ).replace(tzinfo=tz)
-    cb_end_date = datetime.datetime.strptime(cb_end_date, "%Y/%m/%d %H:%M:%S").replace(
+    _CB_START_DATE = datetime.strptime(_DB_START_DATE, "%Y/%m/%d %H:%M:%S").replace(
         tzinfo=tz
     )
+    _CB_END_DATE = datetime.strptime(_DB_END_DATE, "%Y/%m/%d %H:%M:%S").replace(
+        tzinfo=tz
+    )
+
+CB_DATA = PricoCbData(
+    CB_ID=_CB_ID,
+    TIER_THRESHOLD=_CB_TIER_THRESHOLD,
+    BOSSES_DATA=_CB_BOSSES,
+    START_DATE=_CB_START_DATE,
+    END_DATE=_CB_END_DATE,
+)

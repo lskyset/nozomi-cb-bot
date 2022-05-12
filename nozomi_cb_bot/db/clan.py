@@ -8,10 +8,14 @@ import pytz
 
 from .. import config as cfg
 from .. import emoji as e
-from ..config import PREFIX as P
+from ..config import CB_DATA, BotConfig
 from ..db.boss import Boss
 from ..db.member import Member
 from .util import replace_num, update_db
+
+# temp
+bot_config = BotConfig()
+P = bot_config.PREFIX
 
 
 class Clan:
@@ -25,7 +29,7 @@ class Clan:
 
         for key, val in config.items():
             setattr(self, key.lower(), val)
-        if not cfg.DISABLE_DRIVE and self.google_drive_sheet:
+        if not bot_config.DISABLE_DRIVE and self.google_drive_sheet:
             self.gs_sheet = gc.open_by_key(self.google_drive_sheet["SHEET_KEY"])
             self.gs_db = self.gs_sheet.worksheet(
                 self.google_drive_sheet["DATA_WORKSHEET_NAME"]
@@ -37,7 +41,7 @@ class Clan:
         self.members = []
         self.mods = []  # type: ignore
         self.day = math.ceil(
-            (cfg.jst_time() - cfg.cb_start_date).total_seconds() / 60 / 60 / 24
+            (cfg.jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
         )
         self.bosses = []
 
@@ -53,7 +57,7 @@ class Clan:
                 "SELECT discord_id from members_data"
             ).fetchall():
                 self.members.append(Member(member_id, self.conn))
-        for boss_data in cfg.boss_data:
+        for boss_data in CB_DATA.BOSSES_DATA:
             boss = Boss(boss_data, self)
             self.bosses.append(boss)
         self.current_wave = min([boss.wave for boss in self.bosses])
@@ -82,7 +86,7 @@ class Clan:
             time.sleep(1)
         self.drive_loading = True
         self.full_update()
-        if not cfg.DISABLE_DRIVE:
+        if not bot_config.DISABLE_DRIVE:
             update_db(self.drive, self)
         self.drive_loading = False
 
@@ -349,7 +353,7 @@ class Clan:
             f"SELECT * from damage_log WHERE member_id = {member_id} ORDER BY timestamp"
         ).fetchall()
         if not logs:
-            return False
+            return None
         data = logs[-1]
         hit = {}
         columns = c.execute("PRAGMA table_info(damage_log)").fetchall()
@@ -361,9 +365,9 @@ class Clan:
     def undo(self, message):
         member = self.find_member(message.author.id)
         hit = self.find_last_damage_log(member.discord_id)
-        boss = self.find_boss(hit["boss_number"])
         if not hit:
-            return False
+            return None
+        boss = self.find_boss(hit["boss_number"])
 
         boss_hits = boss.get_damage_log()
         p_boss_hits = boss.get_damage_log(wave_offset=-1)
@@ -391,8 +395,8 @@ class Clan:
                 self.conn.commit()
                 boss.hp = hit["damage"]
                 boss.wave -= 1
-                boss.tier = 1 + cfg.tier_threshold.index(
-                    max([i for i in cfg.tier_threshold if boss.wave >= i])
+                boss.tier = 1 + CB_DATA.TIER_THRESHOLD.index(
+                    max([i for i in CB_DATA.TIER_THRESHOLD if boss.wave >= i])
                 )
                 member.remaining_hits += (hit["overflow"] + 1) % 2
                 member.of_number += hit["overflow"]
@@ -408,11 +412,11 @@ class Clan:
         message.respond(
             f"You can only undo your last hit if it's the most recent hit on a boss {message.author.mention}"
         )
-        return False
+        return None
 
     def daily_reset(self):
         self.day = math.ceil(
-            (cfg.jst_time() - cfg.cb_start_date).total_seconds() / 60 / 60 / 24
+            (cfg.jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
         )
         prev_day = self.day - 1
         if prev_day < 1 or prev_day > 5:

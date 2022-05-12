@@ -13,6 +13,7 @@ gspread = "*"
 pydrive = "*"
 oauth2client = "*"
 aiohttp = "==3.8.1"
+python-dotenv = "*"
 
 [dev-packages]
 black = "==20.8b1"
