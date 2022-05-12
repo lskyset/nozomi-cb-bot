@@ -170,7 +170,7 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
         """ """
         clan = find_clan(ctx.message, self.bot.clans)
         if clan:
-            boss = clan.cancel_hit(ctx.message.author.id, ctx.message)
+            boss = clan.cancel_hit(ctx.message.author.id)
             await clan.ui.update(boss.message_id)
 
     @commands.command(aliases=("d",))
