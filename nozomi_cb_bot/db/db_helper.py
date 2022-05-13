@@ -1,6 +1,6 @@
 import sqlite3
 
-from .. import config as cfg
+from nozomi_cb_bot.config import CB_DATA
 
 
 def create_cb_db(name, guild_id, channel_id):
@@ -50,9 +50,9 @@ def create_cb_db(name, guild_id, channel_id):
                 hitting_member_id int,
                 syncing_member_id int)"""
     )
-    for boss in cfg.boss_data:
-        data = (boss["number"], boss["wave"], boss["hp"])
-        c.execute("INSERT INTO boss_data VALUES (?,?,?,0,0,0)", data)
+    for boss in CB_DATA.BOSSES_DATA:
+        data = (boss.NUMBER, boss.MAX_HP_LIST[0])
+        c.execute("INSERT INTO boss_data VALUES (?,1,?,0,0,0)", data)
 
     c.execute(
         """CREATE TABLE chat_log

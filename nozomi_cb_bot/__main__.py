@@ -1,4 +1,5 @@
-from . import nozomi
+from nozomi_cb_bot.nozomi import Nozomi
 
 if __name__ == "__main__":
-    nozomi.start()
+    """Starts the discord bot."""
+    Nozomi().run()
