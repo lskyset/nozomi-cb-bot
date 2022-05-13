@@ -30,6 +30,4 @@ class Nozomi(commands.Bot):
         initialize_events(self)
 
     def run(self):
-        if self.config.DISCORD_TOKEN:
-            super().run(self.config.DISCORD_TOKEN)
-        print("Discord token not found.")
+        super().run(self.config.DISCORD_TOKEN)
