@@ -2,8 +2,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 
-from .. import config as cfg
-from ..config import CB_DATA
+from nozomi_cb_bot import config as cfg
+from nozomi_cb_bot.config import CB_DATA
 
 
 @dataclass

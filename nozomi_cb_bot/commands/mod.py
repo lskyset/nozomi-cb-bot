@@ -2,7 +2,6 @@ from discord.ext import commands
 
 from .. import emoji as e
 from ..config import BotConfig
-from .util import find_clan
 
 P = BotConfig().PREFIX
 
@@ -14,7 +13,9 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         self.bot = bot
 
     async def cog_check(self, ctx):
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if ctx.author.id in clan.mods:
             return True
         if not ctx.message.content.startswith(f"{P}help"):
@@ -29,7 +30,9 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         """ """
         if ctx.message.mentions:
             member = ctx.message.mentions[0]
-            clan = find_clan(ctx.message, self.bot.clans)
+            clan = self.bot.clan_manager.find_clan_by_id(
+                ctx.message.channel.guild.id, ctx.message.channel.id
+            )
             if clan:
                 boss = clan.cancel_hit(member.id, ctx.message)
                 await ctx.message.add_reaction(e.ok)
@@ -41,7 +44,9 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         args = tuple(map(str.lower, args))
         if ctx.message.mentions:
             member = ctx.message.mentions[0]
-            clan = find_clan(ctx.message, self.bot.clans)
+            clan = self.bot.clan_manager.find_clan_by_id(
+                ctx.message.channel.guild.id, ctx.message.channel.id
+            )
             if clan:
                 boss_message = None
                 for boss in clan.bosses:
@@ -61,7 +66,9 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
     @commands.command()
     async def stop(self, ctx):
         """Stops the clan battle"""
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         clan.drive_update()
         clan.conn.close()
         del self.bot.clans[self.bot.clans.index(clan)]
@@ -86,7 +93,9 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         """ Impersonate someone else """
         if ctx.message.mentions:
             member = ctx.message.mentions[0]
-            clan = find_clan(ctx.message, self.bot.clans)
+            clan = self.bot.clan_manager.find_clan_by_id(
+                ctx.message.channel.guild.id, ctx.message.channel.id
+            )
             if clan:
                 message = ctx.message
                 message.author = member

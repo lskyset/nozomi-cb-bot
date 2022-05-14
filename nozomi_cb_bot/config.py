@@ -1,4 +1,3 @@
-import json
 import os
 import sqlite3
 import urllib.request
@@ -11,42 +10,12 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 
-# @dataclass(frozen=True) # new
-@dataclass()  # temp
+@dataclass(frozen=True)
 class BotConfig:
     PREFIX: str = os.getenv("PREFIX") or "!"
     DEFAULT_BOT_ENV: int = int(os.getenv("DEFAULT_BOT_ENV") or 0)
     BOT_ENV: int = int(os.getenv("BOT_ENV") or 0)
     DISCORD_TOKEN: str | None = os.getenv("DISCORD_TOKEN")
-
-    # temp
-    DISABLE_DRIVE: bool = True
-
-    # temp
-    def __post_init__(self) -> None:
-        default_params = {
-            "ENV": BotConfig.BOT_ENV,
-            "GUILD_ID": 0,
-            "CHANNEL_ID": 0,
-            "CLAN_ROLE_ID": 0,
-            "CLAN_MOD_ROLE_ID": 0,
-            "GOOGLE_DRIVE_SHEET": 0,
-            "TIMEOUT_MINUTES": 15,  # zero is infinite timeout
-            "SKIP_LINE": 0,  # 1 disables the restrictions on the queue making it only a visual indicator of intent
-        }
-        if os.path.isfile("clans_config.json"):
-            with open("clans_config.json", "r") as clans_cfg:
-                clan_dict = json.load(clans_cfg)
-                clan_dict.setdefault("default", default_params)
-                for name, data in clan_dict.items():
-                    clan_dict[name] = {**default_params, **data}
-        else:
-            print("clans_config.json not found")
-            clan_dict = {"default": default_params}
-            with open("clans_config.json", "w") as fd:
-                fd.write(json.dumps(clan_dict, indent=4))
-                print("a default clans_config.json was created")
-        self.CLANS = clan_dict
 
 
 @dataclass(frozen=True)
@@ -179,7 +148,7 @@ else:
 CB_DATA = PricoCbData(
     CB_ID=_CB_ID,
     TIER_THRESHOLD=_CB_TIER_THRESHOLD,
-    BOSSES_DATA=_CB_BOSSES,
     START_DATE=_CB_START_DATE,
     END_DATE=_CB_END_DATE,
+    BOSSES_DATA=_CB_BOSSES,
 )

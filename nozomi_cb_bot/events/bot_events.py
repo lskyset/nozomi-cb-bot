@@ -1,50 +1,51 @@
-import os
-
 import discord
-import gspread
 from discord.ext import commands
-from oauth2client.service_account import ServiceAccountCredentials
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
 
 from nozomi_cb_bot import emoji as e
-from nozomi_cb_bot.commands.util import find_clan
-from nozomi_cb_bot.config import BotConfig
-from nozomi_cb_bot.db.clan import Clan
-from nozomi_cb_bot.db.db_helper import create_cb_db
-from nozomi_cb_bot.db.util import download_db
 from nozomi_cb_bot.ui import Ui
 
-bot_config = BotConfig()
-
-gc = None
-drive = None
-if not bot_config.DISABLE_DRIVE:
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        "nozomi-bot-19331373ee16.json", scope
-    )
-    gc = gspread.authorize(creds)
-
-    gauth = GoogleAuth()
-    gauth.LoadCredentialsFile("mycreds.txt")
-    drive = GoogleDrive(gauth)
+# import gspread
+# from nozomi_cb_bot.db.util import download_db
+# from oauth2client.service_account import ServiceAccountCredentials
+# from pydrive.auth import GoogleAuth
+# from pydrive.drive import GoogleDrive
 
 
-def initialize_events(bot: commands.Bot) -> None:
+# gc = None
+# drive = None
+# if not bot_config.DISABLE_DRIVE:
+#     scope = [
+#         "https://spreadsheets.google.com/feeds",
+#         "https://www.googleapis.com/auth/drive",
+#     ]
+#     creds = ServiceAccountCredentials.from_json_keyfile_name(
+#         "nozomi-bot-19331373ee16.json", scope
+#     )
+#     gc = gspread.authorize(creds)
+
+#     gauth = GoogleAuth()
+#     gauth.LoadCredentialsFile("mycreds.txt")
+#     drive = GoogleDrive(gauth)
+
+
+def initialize_events(bot: commands.bot) -> None:
     @bot.event
     async def on_ready():
         print(f"Logged in as {bot.user}.\n")
-        for cfg_clan_name, cfg_clan_data in bot_config.CLANS.items():
-            if (
-                cfg_clan_data["ENV"] == bot_config.BOT_ENV
-                and cfg_clan_name != "default"
-            ):
-                channel = bot.get_channel(cfg_clan_data["CHANNEL_ID"])
-                await cb_init(channel, cfg_clan_name, cfg_clan_data, bot)
+        bot.clan_manager.load_clans_from_config()
+        for clan in bot.clan_manager.clans:
+            if not (channel := bot.get_channel(clan.config.CHANNEL_ID)):
+                continue
+            for member in channel.guild.get_role(clan.config.CLAN_ROLE_ID).members:
+                clan.add_member(member)
+            clan.is_daily_reset = False
+            clan.ui = Ui()
+            print(
+                f"Starting {clan.config.name=} in {channel.guild.name=} {channel.name=}..."
+            )
+            await clan.ui.start(channel, clan)
+            print("Done.")
+        #         await cb_init(channel, cfg_clan_name, cfg_clan_data, bot)
 
     @bot.event
     async def on_button_click(i: discord.Interaction, b: discord.ButtonClick):
@@ -56,7 +57,9 @@ def initialize_events(bot: commands.Bot) -> None:
 
     @bot.event
     async def on_message(message):
-        clan = find_clan(message, bot.clans)
+        clan = bot.clan_manager.find_clan_by_id(
+            message.channel.guild.id, message.channel.id
+        )
         if clan:
             clan.log(message)
             if message.author.bot:
@@ -75,50 +78,22 @@ def initialize_events(bot: commands.Bot) -> None:
             await ctx.message.add_reaction(e.cross)
         elif isinstance(error, ignore_errors):
             return
-        elif bot_config.BOT_ENV > 0:
+        elif bot.config.BOT_ENV > 0:
             raise error
 
 
-async def cb_init(channel, db_name, clan_config, bot):
-    if bot_config.BOT_ENV > 0:
-        db_name += "_dev"
-    path = f"{db_name}.db"
-    clan = setup_database(path, db_name, clan_config, channel, bot)
-    if clan is None:
-        print(f"Failed to initialize clan database for {path}")
-    determine_mods(clan, clan_config, channel)
-    clan.is_daily_reset = False
-    clan.ui = Ui()
-    await clan.ui.start(channel, clan)
+# def setup_database(path, db_name, clan_config, channel, bot):
+#     if os.path.isfile(path) or (
+#         not bot_config.DISABLE_DRIVE and download_db(path, drive)
+#     ):
+#         clan = Clan(db_name, clan_config, drive, gc)
+#     else:
+#         clan.drive_update()
+#     return clan
 
 
-def setup_database(path, db_name, clan_config, channel, bot):
-    clan = None
-    if os.path.isfile(path) or (
-        not bot_config.DISABLE_DRIVE and download_db(path, drive)
-    ):
-        msg = f"{db_name}.db has been started."
-        print_database_message(msg, channel)
-        clan = Clan(db_name, clan_config, drive, gc)
-        bot.clans.append(clan)
-    else:
-        create_cb_db(db_name, channel.guild.id, channel.id)
-        clan = Clan(db_name, clan_config, drive, gc)
-        bot.clans.append(clan)
-        for member in channel.guild.get_role(clan_config["CLAN_ROLE_ID"]).members:
-            clan.add_member(member)
-        msg = f"{db_name}.db has been created and started."
-        print_database_message(msg, channel)
-        clan.drive_update()
-    return clan
-
-
-def determine_mods(clan, clan_config, channel):
-    mods_members = channel.guild.get_role(clan_config["CLAN_MOD_ROLE_ID"]).members
-    for member in mods_members:
-        if clan.find_member(member.id):
-            clan.mods.append(member.id)
-
-
-def print_database_message(msg, channel):
-    print(f'{msg[:-1]} in "{channel.guild.name}" #{channel.name}.')
+# def determine_mods(clan, clan_config, channel):
+#     mods_members = channel.guild.get_role(clan_config["CLAN_MOD_ROLE_ID"]).members
+#     for member in mods_members:
+#         if clan.find_member(member.id):
+#             clan.mods.append(member.id)
