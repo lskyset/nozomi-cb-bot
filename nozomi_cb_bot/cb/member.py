@@ -1,6 +1,6 @@
 import sqlite3
 
-from .. import config as cfg
+from nozomi_cb_bot import config as cfg
 
 
 class Member:

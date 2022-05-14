@@ -2,50 +2,46 @@ import math
 import re
 import sqlite3
 import time
-import typing
+from dataclasses import dataclass, field
 
 import pytz
 
-from .. import config as cfg
-from .. import emoji as e
-from ..config import CB_DATA, BotConfig
-from ..db.boss import Boss
-from ..db.member import Member
-from .util import replace_num, update_db
+from nozomi_cb_bot import emoji as e
+from nozomi_cb_bot.cb.boss import Boss
+from nozomi_cb_bot.cb.member import Member
+from nozomi_cb_bot.config import CB_DATA, BotConfig, ClanConfig, PricoCbData, jst_time
+from nozomi_cb_bot.db.util import replace_num
+from nozomi_cb_bot.protocols.database import CbDatabase
 
 # temp
-bot_config = BotConfig()
-P = bot_config.PREFIX
+P = BotConfig.PREFIX
 
 
+@dataclass
 class Clan:
-    def __init__(self, db_name: str, config: dict, drive: typing.Any, gc: typing.Any):
-        self.google_drive_sheet = {}  # type: ignore
+    config: ClanConfig
+    db: CbDatabase
+    cb_data: PricoCbData
+    bosses: list[Boss] = field(default_factory=list)
+    members: list[Member] = field(default_factory=list)
+
+    def __post_init__(self):
         self.skip_line = 0
         self.timeout_minutes = 0
         self.overview_message_id = -1
-        self.drive = drive
-        self.gc = gc
 
-        for key, val in config.items():
-            setattr(self, key.lower(), val)
-        if not bot_config.DISABLE_DRIVE and self.google_drive_sheet:
-            self.gs_sheet = gc.open_by_key(self.google_drive_sheet["SHEET_KEY"])
-            self.gs_db = self.gs_sheet.worksheet(
-                self.google_drive_sheet["DATA_WORKSHEET_NAME"]
-            )
-            self.gs_chat_log = self.gs_sheet.worksheet(
-                self.google_drive_sheet["CHAT_LOG_WORKSHEET_NAME"]
-            )
+        # if not bot_config.DISABLE_DRIVE and self.google_drive_sheet:
+        #     self.gs_sheet = gc.open_by_key(self.google_drive_sheet["SHEET_KEY"])
+        #     self.gs_db = self.gs_sheet.worksheet(
+        #         self.google_drive_sheet["DATA_WORKSHEET_NAME"]
+        #     )
+        #     self.gs_chat_log = self.gs_sheet.worksheet(
+        #         self.google_drive_sheet["CHAT_LOG_WORKSHEET_NAME"]
+        #     )
         self.drive_loading = False
-        self.members = []
-        self.mods = []  # type: ignore
-        self.day = math.ceil(
-            (cfg.jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
-        )
-        self.bosses = []
 
-        self.conn = sqlite3.connect(db_name + ".db")
+        self.conn = self.db._conn
+        self.c = self.db._c
         c = self.conn.cursor()
         data = c.execute("SELECT * from cb_data").fetchone()
         if data:
@@ -60,12 +56,22 @@ class Clan:
         for boss_data in CB_DATA.BOSSES_DATA:
             boss = Boss(boss_data, self)
             self.bosses.append(boss)
-        self.current_wave = min([boss.wave for boss in self.bosses])
-        self.current_tier = min([boss.tier for boss in self.bosses])
+
+    @property
+    def tier(self) -> int:
+        return min([boss.tier for boss in self.bosses])
+
+    @property
+    def wave(self) -> int:
+        return min([boss.wave for boss in self.bosses])
+
+    @property
+    def day(self) -> int:
+        return math.ceil(
+            (jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
+        )
 
     def update(self):
-        self.current_wave = min([boss.wave for boss in self.bosses])
-        self.current_tier = min([boss.tier for boss in self.bosses])
         c = self.conn.cursor()
         for key, val in self.__dict__.items():
             try:
@@ -86,8 +92,8 @@ class Clan:
             time.sleep(1)
         self.drive_loading = True
         self.full_update()
-        if not bot_config.DISABLE_DRIVE:
-            update_db(self.drive, self)
+        # if not bot_config.DISABLE_DRIVE:
+        #     update_db(self.drive, self)
         self.drive_loading = False
 
     async def hitting(self, member_id: int, message, *args):
@@ -95,7 +101,7 @@ class Clan:
         boss = self.find_boss(message.id)
         if not (member and boss):
             return False
-        if boss.wave - self.current_wave > 1 or boss.tier != self.current_tier:
+        if boss.wave - self.wave > 1 or boss.tier != self.tier:
             await message.channel.send(
                 f"You can't hit B{boss.number} because it's wave or tier is too far ahead {message.author.mention}",
                 delete_after=7,
@@ -178,7 +184,7 @@ class Clan:
                 boss.syncing_member_id = 0
             member.hitting_boss_number = 0
             if boss.get_first_in_queue_id():
-                boss.queue_timeout = cfg.jst_time(minutes=self.timeout_minutes)
+                boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
             member.update()
             boss.update()
             return boss
@@ -215,7 +221,7 @@ class Clan:
                     if (
                         boss.hitting_member_id == 0
                     ):  # if no hitter confirmed within recieve damage
-                        boss.queue_timeout = cfg.jst_time(minutes=self.timeout_minutes)
+                        boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
                 else:
                     await message.respond(
                         f"Damages not found {message.author.mention}\nUse `{P}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
@@ -269,14 +275,14 @@ class Clan:
                 break
 
         if not boss.get_first_in_queue_id():
-            boss.queue_timeout = cfg.jst_time(minutes=self.timeout_minutes)
+            boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
         data = (
             boss.number,
             member.discord_id,
             member.name,
             False,
             note,
-            int(cfg.jst_time().timestamp()),
+            int(jst_time().timestamp()),
             queue_wave,
         )
         c.execute("INSERT INTO queue VALUES (?,?,?,?,?,?,?)", data)
@@ -287,7 +293,7 @@ class Clan:
         if not boss:
             return
         if boss.queue_timeout and (
-            (boss.queue_timeout - cfg.jst_time()).total_seconds() <= 0
+            (boss.queue_timeout - jst_time()).total_seconds() <= 0
         ):
             first_in_queue_id = boss.get_first_in_queue_id()
             self.dequeue(first_in_queue_id, message)
@@ -304,7 +310,7 @@ class Clan:
         self.conn.commit()
         fiq_id = boss.get_first_in_queue_id()
         if fiq_id and fiq_id == member_id:
-            boss.queue_timeout = cfg.jst_time(minutes=self.timeout_minutes)
+            boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
 
     def add_member(self, member):
         c = self.conn.cursor()
@@ -343,7 +349,7 @@ class Clan:
             damage,
             overflow,
             dead,
-            int(cfg.jst_time().timestamp()),
+            int(jst_time().timestamp()),
         )
         c.execute("INSERT INTO damage_log VALUES (?,?,?,?,?,?,?,?)", data)
 
@@ -416,7 +422,7 @@ class Clan:
 
     def daily_reset(self):
         self.day = math.ceil(
-            (cfg.jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
+            (jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
         )
         prev_day = self.day - 1
         if prev_day < 1 or prev_day > 5:
