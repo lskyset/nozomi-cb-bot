@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 
 import discord
 
-from . import config as cfg
-from .db.boss import Boss
-from .db.clan import Clan
+from nozomi_cb_bot import config as cfg
+from nozomi_cb_bot.cb.boss import Boss
+from nozomi_cb_bot.cb.clan import Clan
 
 
 @dataclass
@@ -45,7 +45,7 @@ class BossBox:
 
     async def update(self) -> None:
 
-        self.wave_offset = self.boss.wave - self.clan.current_wave
+        self.wave_offset = self.boss.wave - self.clan.wave
         if self.wave_offset > 1:
             self.boss.queue_timeout = None
         elif self.boss.queue_timeout is None and not self.boss.hitting_member_id:
@@ -161,7 +161,7 @@ class BossBox:
         if (
             self.boss.hitting_member_id
             or self.wave_offset > 1
-            or self.boss.tier != self.clan.current_tier
+            or self.boss.tier != self.clan.tier
         ):
             hit_button = self.disabled_hit_button
         else:
@@ -193,12 +193,10 @@ class OverviewBox:
     )
 
     async def update(self) -> None:
-        self.embed.set_author(
-            name=f"Tier {self.clan.current_tier}: Wave {self.clan.current_wave}"
-        )
+        self.embed.set_author(name=f"Tier {self.clan.tier}: Wave {self.clan.wave}")
         self.embed.clear_fields()
         for boss in self.clan.bosses:
-            wave_offset = boss.wave - self.clan.current_wave
+            wave_offset = boss.wave - self.clan.wave
             self.embed.add_field(
                 name=f"Boss {boss.number} : {boss.name}",
                 value=f"**Wave {boss.wave}**{f' (+{wave_offset})' * (wave_offset > 0)} \n"

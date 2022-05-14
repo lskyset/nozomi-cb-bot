@@ -3,7 +3,6 @@ from discord.ext import commands, tasks
 from .. import config as cfg
 from .. import emoji as e
 from ..config import CB_DATA, BotConfig
-from .util import find_clan
 
 P = BotConfig().PREFIX
 
@@ -24,7 +23,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     @commands.command()
     async def of(self, ctx):
         """ """
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             member = clan.find_member(ctx.author.id)
             if member:
@@ -34,7 +35,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     @commands.command()
     async def rmof(self, ctx):
         """ """
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             member = clan.find_member(ctx.author.id)
             if member:
@@ -45,7 +48,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     async def queue(self, ctx, *args, from_button=False):
         """ """
         args = tuple(map(str.lower, args))
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             boss_message = None
             if from_button:
@@ -76,7 +81,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     async def dequeue(self, ctx, *args):
         """ """
         args = tuple(map(str.lower, args))
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             boss_message = None
             for boss in clan.bosses:
@@ -97,7 +104,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     async def hit(self, ctx, *args, from_button=False):
         """ """
         args = tuple(map(str.lower, args))
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             boss_message = None
             if from_button:
@@ -134,7 +143,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
                     f"You can't sync with yourself {ctx.author.mention}", delete_after=5
                 )
                 return
-            clan = find_clan(ctx.message, self.bot.clans)
+            clan = self.bot.clan_manager.find_clan_by_id(
+                ctx.message.channel.guild.id, ctx.message.channel.id
+            )
             if clan:
                 boss_message = None
                 hit_member = clan.find_member(ctx.author.id)
@@ -170,7 +181,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     @commands.command(aliases=("c",))
     async def cancel(self, ctx):
         """ """
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             boss = clan.cancel_hit(ctx.message.author.id)
             await clan.ui.update(boss.message_id)
@@ -185,7 +198,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
             )
             return
         args = tuple(map(str.lower, args))
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             boss_message_id = await clan.done(ctx.message.author.id, ctx.message, *args)
             self.bot.get_command("done").reset_cooldown(ctx)
@@ -202,7 +217,9 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
     @commands.command()
     async def undo(self, ctx):
         """ """
-        clan = find_clan(ctx.message, self.bot.clans)
+        clan = self.bot.clan_manager.find_clan_by_id(
+            ctx.message.channel.guild.id, ctx.message.channel.id
+        )
         if clan:
             boss = clan.undo(ctx.message)
             if boss:
@@ -211,7 +228,7 @@ class Cb_commands(commands.Cog, name="CB Commands"):  # type: ignore
 
     @tasks.loop(seconds=20)
     async def ui_update_loop(self):
-        for clan in self.bot.clans:
+        for clan in self.bot.clan_manager.clans:
             if clan.is_daily_reset:
                 clan.daily_reset()
                 clan.is_daily_reset = False
