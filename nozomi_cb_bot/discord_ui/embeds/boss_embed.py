@@ -24,7 +24,7 @@ class BossEmbed(discord.Embed):
 
     def _boss_description(self):
         # title
-        hp_text = "HP : *{:,} / {:,}*".format(self._boss.hp, self._boss.max_hp)
+        hp_text = "HP : *{:,} / {:,}*\n".format(self._boss.hp, self._boss.max_hp)
 
         # previous damage log
         p_damage_log = self._boss.get_damage_log(wave_offset=-1)
@@ -33,7 +33,6 @@ class BossEmbed(discord.Embed):
             p_damage_text += "**Previous wave :** \n"
             for hit in p_damage_log:
                 p_damage_text += f"-**{hit['member_name']}** dealt *{int(hit['damage']):,}* damages. {'(OF)' * hit['overflow']} \n"
-            p_damage_text += "\n"
 
         # damage log
         damage_log = self._boss.get_damage_log()
@@ -42,7 +41,6 @@ class BossEmbed(discord.Embed):
             damage_text += "**Damage logs :** \n"
             for hit in damage_log:
                 damage_text += f"-**{hit['member_name']}** dealt *{int(hit['damage']):,}* damages. {'(OF)' * hit['overflow']} \n"
-            damage_text += "\n"
 
         # queue
         queue = self._boss.get_queue()
@@ -90,13 +88,12 @@ class BossEmbed(discord.Embed):
                     member = self._boss.clan.find_member(member_data["member_id"])
                     note_text = f": {member_data['note']}" * bool(member_data["note"])
                     queue_text += f"-[Wave{member_data['wave']}] {member.name}{note_text}{' (OF)' * member.of_status}\n"
-            queue_text += "\n"
         text_list = [
             text
             for text in (hp_text, p_damage_text, damage_text, queue_text)
             if len(text)
         ]
-        return "\n\n".join(text_list).rstrip()
+        return "\n".join(text_list).rstrip()
 
     def _set_boss_footer(self) -> None:
         if self._boss.hitting_member is None:
