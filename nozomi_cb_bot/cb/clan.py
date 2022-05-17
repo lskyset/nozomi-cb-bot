@@ -1,20 +1,22 @@
+from __future__ import annotations
+
 import math
 import re
-import sqlite3
 import time
 from dataclasses import dataclass, field
+from functools import reduce
+from typing import TYPE_CHECKING
 
+import discord
 import pytz
 
-from nozomi_cb_bot import emoji as e
-from nozomi_cb_bot.cb.boss import Boss
-from nozomi_cb_bot.cb.member import Member
+from nozomi_cb_bot import emoji
 from nozomi_cb_bot.config import CB_DATA, BotConfig, ClanConfig, PricoCbData, jst_time
 from nozomi_cb_bot.db.util import replace_num
 from nozomi_cb_bot.protocols.database import CbDatabase
 
-# temp
-P = BotConfig.PREFIX
+if TYPE_CHECKING:
+    from nozomi_cb_bot import cb
 
 
 @dataclass
@@ -22,13 +24,19 @@ class Clan:
     config: ClanConfig
     db: CbDatabase
     cb_data: PricoCbData
-    bosses: list[Boss] = field(default_factory=list)
-    members: list[Member] = field(default_factory=list)
+    bosses: list[cb.Boss] = field(default_factory=list)
+    members: list[cb.Member] = field(default_factory=list)
+    overview_message_id: int | None = None
+    _overview_message: discord.Message | None = None
+    d1_dmg: int = 0
+    d2_dmg: int = 0
+    d3_dmg: int = 0
+    d4_dmg: int = 0
+    d5_dmg: int = 0
 
     def __post_init__(self):
         self.skip_line = 0
         self.timeout_minutes = 0
-        self.overview_message_id = -1
 
         # if not bot_config.DISABLE_DRIVE and self.google_drive_sheet:
         #     self.gs_sheet = gc.open_by_key(self.google_drive_sheet["SHEET_KEY"])
@@ -40,22 +48,24 @@ class Clan:
         #     )
         self.drive_loading = False
 
-        self.conn = self.db._conn
-        self.c = self.db._c
-        c = self.conn.cursor()
+        c = self.db._c
         data = c.execute("SELECT * from cb_data").fetchone()
         if data:
             columns = c.execute("PRAGMA table_info(cb_data)").fetchall()
             for column in columns:
                 if data[column[0]] is not None:
                     setattr(self, column[1], data[column[0]])
-            for (member_id,) in c.execute(
-                "SELECT discord_id from members_data"
-            ).fetchall():
-                self.members.append(Member(member_id, self.conn))
-        for boss_data in CB_DATA.BOSSES_DATA:
-            boss = Boss(boss_data, self)
-            self.bosses.append(boss)
+        self.bosses = self.db.get_bosses(self)
+
+    @property
+    def overview_message(self) -> discord.Message | None:
+        return self._overview_message
+
+    @overview_message.setter
+    def overview_message(self, message: discord.Message) -> None:
+        self._overview_message = message
+        self.overview_message_id = message.id
+        self._save()
 
     @property
     def tier(self) -> int:
@@ -71,21 +81,21 @@ class Clan:
             (jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
         )
 
-    def update(self):
-        c = self.conn.cursor()
-        for key, val in self.__dict__.items():
-            try:
-                c.execute(f"UPDATE cb_data SET {key} = ?", (val,))
-            except sqlite3.OperationalError:
-                pass
-        self.conn.commit()
+    @property
+    def hits_left(self) -> int:
+        return reduce(
+            lambda a, b: a + b, [member.remaining_hits for member in self.members]
+        )
+
+    def _save(self):
+        self.db.save_clan(self)
 
     def full_update(self):
         for member in self.members:
-            member.update()
+            member._save()
         for boss in self.bosses:
-            boss.update()
-        self.update()
+            boss._save()
+        self._save()
 
     def drive_update(self):
         while self.drive_loading:
@@ -96,26 +106,26 @@ class Clan:
         #     update_db(self.drive, self)
         self.drive_loading = False
 
-    async def hitting(self, member_id: int, message, *args):
+    async def hitting(self, member_id: int, message: discord.PartialMessage, *args):
         member = self.find_member(member_id)
         boss = self.find_boss(message.id)
         if not (member and boss):
             return False
         if boss.wave - self.wave > 1 or boss.tier != self.tier:
             await message.channel.send(
-                f"You can't hit B{boss.number} because it's wave or tier is too far ahead {message.author.mention}",
+                f"You can't hit B{boss.number} because it's wave or tier is too far ahead {member.discord_member.mention}",
                 delete_after=7,
             )
             return False
         if member.hitting_boss_number:
             await message.channel.send(
-                f"You are already hitting B{member.hitting_boss_number} {message.author.mention}",
+                f"You are already hitting B{member.hitting_boss_number} {member.discord_member.mention}",
                 delete_after=5,
             )
             return False
         if boss.hitting_member_id and boss.hitting_member_id != member.discord_id:
             await message.channel.send(
-                f"Someone is already hitting B{boss.number} {message.author.mention}",
+                f"Someone is already hitting B{boss.number} {member.discord_member.mention}",
                 delete_after=5,
             )
             return False
@@ -123,17 +133,17 @@ class Clan:
             fiq_iq = boss.get_first_in_queue_id()
             if fiq_iq and member.discord_id != fiq_iq:
                 await message.channel.send(
-                    f"You don't have priority to hit this boss {message.author.mention}",
+                    f"You don't have priority to hit this boss {member.discord_member.mention}",
                     delete_after=5,
                 )
                 return False
-        member.of_status = "of" in args or member.of_status
+        member._of_status = "of" in args or member.of_status
         boss.hitting_member_id = member.discord_id
-        member.hitting_boss_number = boss.number
+        member._hitting_boss_number = boss.number
         self.dequeue(member.discord_id, message)
         boss.queue_timeout = None
-        member.update()
-        boss.update()
+        member._save()
+        boss._save()
         return True
 
     async def syncing(self, member_id: int, sync_member_id: int, message, *args):
@@ -149,20 +159,21 @@ class Clan:
             return False
         if sync_member.hitting_boss_number:
             await message.channel.send(
-                f"{sync_member.name} is already hitting B{sync_member.hitting_boss_number} {message.author.mention}",
+                f"{sync_member.name} is already hitting B{sync_member.hitting_boss_number} {member.discord_member.mention}",
                 delete_after=7,
             )
             return False
-        if boss.syncing_member_id:
+        if boss.syncing_member_id is not None:
             old_sync_member = self.find_member(boss.syncing_member_id)
-            old_sync_member.hitting_boss_number = 0
-            old_sync_member.update()
+            if old_sync_member is not None:
+                old_sync_member._hitting_boss_number = 0
+                old_sync_member._save()
         boss.syncing_member_id = sync_member.discord_id
-        sync_member.hitting_boss_number = boss.number
+        sync_member._hitting_boss_number = boss.number
         self.dequeue(sync_member.discord_id, message)
         boss.queue_timeout = None
-        sync_member.update()
-        boss.update()
+        sync_member._save()
+        boss._save()
         return True
 
     def cancel_hit(self, member_id: int):
@@ -177,22 +188,23 @@ class Clan:
                 boss.hitting_member_id = 0
                 sync_member = self.find_member(boss.syncing_member_id)
                 if sync_member:
-                    sync_member.hitting_boss_number = 0
-                    sync_member.update()
+                    sync_member._hitting_boss_number = 0
+                    sync_member._save()
                 boss.syncing_member_id = 0
             elif boss.syncing_member_id == member.discord_id:
                 boss.syncing_member_id = 0
-            member.hitting_boss_number = 0
+            member._hitting_boss_number = 0
             if boss.get_first_in_queue_id():
                 boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
-            member.update()
-            boss.update()
+            member._save()
+            boss._save()
             return boss
 
     async def done(self, member_id: int, message, *args):
         member = self.find_member(member_id)
-        boss = self.find_boss(member.hitting_boss_number)
-        if member and boss:
+        if member is not None:
+            boss = self.find_boss(member.hitting_boss_number)
+        if member is not None and boss is not None:
             if args:
                 parsedDmg = re.match(
                     r"^([0-9]+\.?[0-9]*([mk])?)", args[0].replace(",", ".")
@@ -201,15 +213,15 @@ class Clan:
                     return False
                 dmg = min(replace_num(parsedDmg.group(0)), boss.hp)
                 if dmg:
-                    await message.add_reaction(e.ok)
-                    member.of_status = "of" in args or member.of_status
+                    await message.add_reaction(emoji.ok)
+                    member._of_status = "of" in args or member.of_status
                     if not member.of_status and member.remaining_hits <= 0:
                         await message.channel.send(
-                            f"You don't have any hits left {message.author.mention}\nYour hit was counted as Overflow",
+                            f"You don't have any hits left {member.discord_member.mention}\nYour hit was counted as Overflow",
                             delete_after=7,
                         )
                         member.of_status = True
-                    of = member.of_status
+                    of = member._of_status
                     boss_is_dead = member.deal_damage(dmg, boss)
                     self.add_damage_log(boss, member, dmg, of, boss_is_dead)
                     setattr(
@@ -223,20 +235,21 @@ class Clan:
                     ):  # if no hitter confirmed within recieve damage
                         boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
                 else:
-                    await message.respond(
-                        f"Damages not found {message.author.mention}\nUse `{P}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
+                    await message.reply(
+                        f"Damages not found {member.discord_member.mention}\nUse `{BotConfig.PREFIX}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
                         delete_after=7,
                     )
             else:
-                await message.respond(
-                    f"Argument not found {message.author.mention}\nUse `{P}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
+                await message.reply(
+                    f"Argument not found {member.discord_member.mention}\nUse `{BotConfig.PREFIX}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
                     delete_after=7,
                 )
         else:
-            await message.channel.send(
-                f"You must claim a hit before registering damages {message.author.mention}\nFor example use `{P}h b1` to claim a hit on b1.",
-                delete_after=7,
-            )
+            if member is not None:
+                await message.channel.send(
+                    f"You must claim a hit before registering damages {member.discord_member.mention}\nFor example use `{BotConfig.PREFIX}h b1` to claim a hit on b1.",
+                    delete_after=7,
+                )
 
     async def queue(self, member_id: int, message, *args):
         member = self.find_member(member_id)
@@ -245,22 +258,23 @@ class Clan:
             return
         if member.hitting_boss_number == boss.number:
             return await message.channel.send(
-                f"You can't queue a boss you are hitting {message.author.mention}",
+                f"You can't queue a boss you are hitting {member.discord_member.mention}",
                 delete_after=7,
             )
 
-        c = self.conn.cursor()
+        c = self.db._c
         already_in_queue = c.execute(
             f"SELECT * from queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}"
         ).fetchone()
         if already_in_queue:
             return await message.channel.send(
-                f"You are already in the queue {message.author.mention}", delete_after=7
+                f"You are already in the queue {member.discord_member.mention}",
+                delete_after=7,
             )
 
         if "of" in args:
             member.of_status = True
-            member.update()
+            member._save()
 
         full_arg = " ".join(args)
         note = ""
@@ -286,7 +300,7 @@ class Clan:
             queue_wave,
         )
         c.execute("INSERT INTO queue VALUES (?,?,?,?,?,?,?)", data)
-        self.conn.commit()
+        self.db._conn.commit()
 
     def check_queue(self, message):
         boss = self.find_boss(message.id)
@@ -303,17 +317,17 @@ class Clan:
         boss = self.find_boss(message.id)
         if not (member and boss):
             return
-        c = self.conn.cursor()
+        c = self.db._c
         c.execute(
             f"DELETE FROM queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}"
         )
-        self.conn.commit()
+        self.db._conn.commit()
         fiq_id = boss.get_first_in_queue_id()
         if fiq_id and fiq_id == member_id:
             boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
 
     def add_member(self, member):
-        c = self.conn.cursor()
+        c = self.db._c
         data = (member.id, member.display_name)
         c.execute(
             "INSERT INTO members_data VALUES (?,?,3, 0, 0, 0, 0, 0, 0, 0, False, 0, 0)",
@@ -323,24 +337,33 @@ class Clan:
             "INSERT INTO missed_hits_data VALUES (?,?,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
             data,
         )
-        self.members.append(Member(member.id, self.conn))
-        self.conn.commit()
+        self.members.append(cb.Member(member.id, self.db._conn))
+        self.db._conn.commit()
 
-    def find_member(self, member_id: int):
+    def add_members(self, members: list[discord.Member]):
+        self.members = self.db.get_members(self, members)
+
+    def find_member(self, member_id: int | None) -> cb.Member | None:
+        if member_id is None:
+            return None
         for member in self.members:
             if member.discord_id == member_id:
                 return member
+        return None
 
-    def find_boss(self, message_id_or_boss_number: int):
+    def find_boss(self, message_id_or_boss_number: int) -> cb.Boss | None:
         for boss in self.bosses:
             if (
-                boss.message_id == message_id_or_boss_number
+                boss._message_id == message_id_or_boss_number
                 or boss.number == message_id_or_boss_number
             ):
                 return boss
+        return None
 
-    def add_damage_log(self, boss, member, damage: int, overflow=False, dead=False):
-        c = self.conn.cursor()
+    def add_damage_log(
+        self, boss: cb.Boss, member: cb.Member, damage: int, overflow=False, dead=False
+    ):
+        c = self.db._c
         data = (
             boss.number,
             boss.wave - 1 * dead,
@@ -354,7 +377,7 @@ class Clan:
         c.execute("INSERT INTO damage_log VALUES (?,?,?,?,?,?,?,?)", data)
 
     def find_last_damage_log(self, member_id: int):
-        c = self.conn.cursor()
+        c = self.db._c
         logs = c.execute(
             f"SELECT * from damage_log WHERE member_id = {member_id} ORDER BY timestamp"
         ).fetchall()
@@ -368,7 +391,7 @@ class Clan:
                 hit[column[1]] = data[column[0]]
         return hit
 
-    def undo(self, message):
+    async def undo(self, message):
         member = self.find_member(message.author.id)
         hit = self.find_last_damage_log(member.discord_id)
         if not hit:
@@ -380,43 +403,39 @@ class Clan:
 
         if boss_hits:
             if hit == boss_hits[-1]:
-                c = self.conn.cursor()
+                c = self.db._c
                 c.execute(
                     f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}'
                 )
-                self.conn.commit()
+                self.db._conn.commit()
                 boss.hp += hit["damage"]
                 member.remaining_hits += (hit["overflow"] + 1) % 2
                 member.of_number += hit["overflow"]
                 member.of_status = bool(hit["overflow"])
-                member.update()
-                boss.update()
+                member._save()
+                boss._save()
                 return boss
         elif p_boss_hits:
             if hit == p_boss_hits[-1]:
-                c = self.conn.cursor()
+                c = self.db._c
                 c.execute(
                     f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}'
                 )
-                self.conn.commit()
-                boss.hp = hit["damage"]
-                boss.wave -= 1
-                boss.tier = 1 + CB_DATA.TIER_THRESHOLD.index(
-                    max([i for i in CB_DATA.TIER_THRESHOLD if boss.wave >= i])
-                )
+                self.db._conn.commit()
+                boss._hp = hit["damage"]
+                boss._wave -= 1
                 member.remaining_hits += (hit["overflow"] + 1) % 2
-                member.of_number += hit["overflow"]
+                member._of_number += hit["overflow"]
                 setattr(
                     member,
-                    f"b{boss.number}_hits",
-                    getattr(member, f"b{boss.number}_hits") - 1,
+                    f"_b{boss.number}_hits",
+                    getattr(member, f"_b{boss.number}_hits") - 1,
                 )
-                member.total_hits -= 1
-                member.update()
-                boss.update()
+                member._save()
+                boss._save()
                 return boss
-        message.respond(
-            f"You can only undo your last hit if it's the most recent hit on a boss {message.author.mention}"
+        await message.reply(
+            f"You can only undo your last hit if it's the most recent hit on a boss {member.discord_member.mention}"
         )
         return None
 
@@ -428,7 +447,7 @@ class Clan:
         if prev_day < 1 or prev_day > 5:
             return
         print(f"\nDay {prev_day} hits :")
-        c = self.conn.cursor()
+        c = self.db._c
         for member in self.members:
             data = list(
                 c.execute(
@@ -454,7 +473,7 @@ class Clan:
             member.remaining_hits = 3
             member.of_status = False
             member.of_number = 0
-            member.update()
+            member._save()
         self.drive_update()
 
     def log(self, message):
@@ -463,6 +482,6 @@ class Clan:
                 "%m/%d/%Y %H:%M:%S"
             )
             log = (jst, message.author.display_name, message.clean_content)
-            c = self.conn.cursor()
+            c = self.db._c
             c.execute("INSERT INTO chat_log VALUES (?,?,?)", log)
-            self.conn.commit()
+            self.db._conn.commit()
