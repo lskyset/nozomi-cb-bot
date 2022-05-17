@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pytz
 from dotenv import load_dotenv
 
+print("Loading .env environment variables...")
 load_dotenv(override=True)
 
 
@@ -67,6 +68,7 @@ class PricoCbData:
     BOSSES_DATA: list[BossData]
 
 
+print("Downloading master.db")
 _DB_URL = "https://github.com/lskyset/nozomi-cb-data/raw/main/master.db"
 _DB_NAME = "master.db"
 urllib.request.urlretrieve(_DB_URL, _DB_NAME)
@@ -127,6 +129,7 @@ def jst_time(minutes: int = 0, seconds: int = 0) -> datetime:
     return jst_now + timedelta(minutes=minutes, seconds=seconds)
 
 
+print("Loading clanbattle data.")
 _CB_ID, _DB_START_DATE, _DB_END_DATE = _c.execute(
     "SELECT clan_battle_id, start_time, end_time from clan_battle_period"
 ).fetchall()[-1]

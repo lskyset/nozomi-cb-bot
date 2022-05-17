@@ -1,12 +1,10 @@
 from discord.ext import commands
 
-from .. import emoji as e
-from ..config import BotConfig
-
-P = BotConfig().PREFIX
+from nozomi_cb_bot import emoji
+from nozomi_cb_bot.nozomi import Nozomi
 
 
-class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
+class ModCommands(commands.Cog, name="Mod Commands"):  # type: ignore
     """Mod Commands are commands that can only be used by the clan's leader and sub-leaders."""
 
     def __init__(self, bot):
@@ -18,7 +16,7 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         )
         if ctx.author.id in clan.mods:
             return True
-        if not ctx.message.content.startswith(f"{P}help"):
+        if not ctx.message.content.startswith(f"{self.bot.command_prefix}help"):
             await ctx.send(
                 f"You dont have the permission to use this command {ctx.author.mention}",
                 delete_after=5,
@@ -35,7 +33,7 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
             )
             if clan:
                 boss = clan.cancel_hit(member.id, ctx.message)
-                await ctx.message.add_reaction(e.ok)
+                await ctx.message.add_reaction(emoji.ok)
                 await clan.ui.update(boss.message_id)
 
     @commands.command(aliases=("fdq",))
@@ -59,7 +57,7 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
                     await clan.ui.update(boss.message_id)
                 else:
                     await ctx.send(
-                        f"Argument not found {ctx.author.mention}\nUse for example `{P}fdq @Nozomi b1` to unqueue Nozomi from b1's queue",
+                        f"Argument not found {ctx.author.mention}\nUse for example `{self.bot.command_prefix}fdq @Nozomi b1` to unqueue Nozomi from b1's queue",
                         delete_after=5,
                     )
 
@@ -72,7 +70,7 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         clan.drive_update()
         clan.conn.close()
         del self.bot.clans[self.bot.clans.index(clan)]
-        await ctx.message.add_reaction(e.ok)
+        await ctx.message.add_reaction(emoji.ok)
 
     @commands.command()
     async def shutdown(self, ctx):
@@ -80,7 +78,7 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
         for clan in self.bot.clans:
             clan.drive_update()
             clan.conn.close()
-        await ctx.message.add_reaction(e.ok)
+        await ctx.message.add_reaction(emoji.ok)
         await self.bot.close()
 
     @commands.command(aliases=("force_reset",))
@@ -106,3 +104,7 @@ class Mod_commands(commands.Cog, name="Mod Commands"):  # type: ignore
 def daily_reset(clans):
     for clan in clans:
         clan.daily_reset()
+
+
+async def setup(bot: Nozomi):
+    await bot.add_cog(ModCommands(bot))

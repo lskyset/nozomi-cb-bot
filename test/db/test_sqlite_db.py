@@ -9,7 +9,7 @@ import pytest
 def sqlite_db(mocker, mock_sqlite3):
     sys.modules["os"] = mocker.MagicMock()
     sys.modules["sqlite3"] = mock_sqlite3
-    sys.modules["nozomi_cb_bot.cb.boss"] = mocker.MagicMock()
+    sys.modules["nozomi_cb_bot.cb"] = mocker.MagicMock()
     sys.modules["nozomi_cb_bot.config"] = mock_config
     from nozomi_cb_bot.db import sqlite_db
 
@@ -52,10 +52,10 @@ class Test_SqliteDatabase:
         default_SqliteDatabase(sqlite_db)
         initialize_cb.assert_not_called()
 
-    def test_update(self, sqlite_db, mocker):
-        _update = mocker.spy(sqlite_db.SqliteDatabase, "_update")
+    def test_save(self, sqlite_db, mocker):
+        _save = mocker.spy(sqlite_db.SqliteDatabase, "_save")
         default_SqliteDatabase(sqlite_db)
-        _update.assert_not_called()
+        _save.assert_not_called()
 
     def test_create_tables(self, sqlite_db, mocker):
         _create_tables = mocker.spy(sqlite_db.SqliteDatabase, "_create_tables")
