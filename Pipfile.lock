@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "533956d720505ab1dd437fce7068842ba16cb0d498eef7c9c9399ba0e5b7f4ed"
+            "sha256": "523e42ee10f4dbfa2659396ebd52035cf5e13a0bf74772ddce46b05c31e20d7d"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -120,11 +120,11 @@
         },
         "cachetools": {
             "hashes": [
-                "sha256:486471dfa8799eb7ec503a8059e263db000cdda20075ce5e48903087f79d5fd6",
-                "sha256:8fecd4203a38af17928be7b90689d8083603073622229ca7077b72d8e5a976e4"
+                "sha256:4ebbd38701cdfd3603d1f751d851ed248ab4570929f2d8a7ce69e30c420b141c",
+                "sha256:8b3b8fa53f564762e5b221e9896798951e7f915513abf2ba072ce0f07f3f5a98"
             ],
             "markers": "python_version ~= '3.7'",
-            "version": "==5.0.0"
+            "version": "==5.1.0"
         },
         "certifi": {
             "hashes": [
@@ -193,17 +193,17 @@
                 "sha256:2857e29ff0d34db842cd7ca3230549d1a697f96ee6d3fb071cfa6c7393832597",
                 "sha256:6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df"
             ],
-            "markers": "python_version >= '3.5'",
+            "markers": "python_full_version >= '3.5.0'",
             "version": "==2.0.12"
         },
         "discord-py": {
-            "editable": true,
-            "extras": [],
+            "extras": [
+                "voice"
+            ],
             "git": "https://github.com/Rapptz/discord.py.git",
-            "ref": "b7e25645dc68bbb828bf1ede711d098c6b183237"
+            "ref": "30c7a2179f45d370d4d2591c54943267d4fd1078"
         },
         "discord.py": {
-            "editable": true,
             "extras": [
                 "voice"
             ],
@@ -284,11 +284,11 @@
         },
         "google-api-python-client": {
             "hashes": [
-                "sha256:44492f8abf87e8316a699a8ce2d6370b69538edbcd028b8defaae74eeeaebadc",
-                "sha256:b5201be41304b730e697824d84b24d3a404bd4b9b0fd3e94dcd30599fd642641"
+                "sha256:4527f7b8518a795624ab68da412d55628f83b98c67dd6a5d6edf725454f8b30b",
+                "sha256:600c43d7eac6e3536fdcad1d14ba9ee503edf4c7db0bd827e791bbf03b9f1330"
             ],
             "markers": "python_version >= '3.6'",
-            "version": "==2.47.0"
+            "version": "==2.48.0"
         },
         "google-auth": {
             "hashes": [
@@ -342,7 +342,7 @@
                 "sha256:84d9dd047ffa80596e0f246e2eab0b391788b0503584e8945f2368256d2735ff",
                 "sha256:9d643ff0a55b762d5cdb124b8eaa99c66322e2157b69160bc32796e824360e6d"
             ],
-            "markers": "python_version >= '3.5'",
+            "markers": "python_full_version >= '3.5.0'",
             "version": "==3.3"
         },
         "multidict": {
