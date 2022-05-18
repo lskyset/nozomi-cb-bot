@@ -9,6 +9,7 @@ import pytest
 def sqlite_db(mocker, mock_sqlite3):
     sys.modules["os"] = mocker.MagicMock()
     sys.modules["sqlite3"] = mock_sqlite3
+    sys.modules["discord"] = mocker.MagicMock()
     sys.modules["nozomi_cb_bot.cb"] = mocker.MagicMock()
     sys.modules["nozomi_cb_bot.config"] = mock_config
     from nozomi_cb_bot.db import sqlite_db
