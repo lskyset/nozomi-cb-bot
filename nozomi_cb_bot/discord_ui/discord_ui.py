@@ -107,6 +107,7 @@ def compare_embeds(
                     old.footer.text == new.footer.text,
                     old.footer.icon_url == new.footer.icon_url,
                     old.image.url == new.image.url,
+                    old.colour == new.colour,
                     compare_embed_fields(old.fields, new.fields),
                 )
             )

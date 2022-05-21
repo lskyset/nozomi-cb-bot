@@ -155,3 +155,11 @@ CB_DATA = PricoCbData(
     END_DATE=_CB_END_DATE,
     BOSSES_DATA=_CB_BOSSES,
 )
+
+TIER_COLOUR = [
+    (132, 189, 107),
+    (112, 166, 225),
+    (200, 109, 167),
+    (206, 80, 68),
+    (181, 105, 209),
+]

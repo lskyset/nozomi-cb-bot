@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 import discord
 import pytz
 
-from nozomi_cb_bot import emoji
-from nozomi_cb_bot.config import CB_DATA, BotConfig, ClanConfig, PricoCbData, jst_time
+from nozomi_cb_bot.config import CB_DATA, ClanConfig, PricoCbData, jst_time
 from nozomi_cb_bot.db.util import replace_num
 from nozomi_cb_bot.protocols.database import CbDatabase
+from nozomi_cb_bot.response_messages import ErrorMessage, NoticeMessage
 
 if TYPE_CHECKING:
     from nozomi_cb_bot import cb
@@ -106,171 +106,114 @@ class Clan:
         #     update_db(self.drive, self)
         self.drive_loading = False
 
-    async def hitting(self, member_id: int, message: discord.PartialMessage, *args):
-        member = self.find_member(member_id)
-        boss = self.find_boss(message.id)
-        if not (member and boss):
-            return False
+    def hitting(self, member: cb.Member, boss: cb.Boss, *args) -> ErrorMessage | None:
         if boss.wave - self.wave > 1 or boss.tier != self.tier:
-            await message.channel.send(
-                f"You can't hit B{boss.number} because it's wave or tier is too far ahead {member.discord_member.mention}",
-                delete_after=7,
-            )
-            return False
+            return ErrorMessage.BOSS_WAVE_AHEAD
         if member.hitting_boss_number:
-            await message.channel.send(
-                f"You are already hitting B{member.hitting_boss_number} {member.discord_member.mention}",
-                delete_after=5,
-            )
-            return False
+            return ErrorMessage.MEMBER_ALREADY_HITTING
         if boss.hitting_member_id and boss.hitting_member_id != member.discord_id:
-            await message.channel.send(
-                f"Someone is already hitting B{boss.number} {member.discord_member.mention}",
-                delete_after=5,
-            )
-            return False
+            return ErrorMessage.BOSS_ALREADY_HIT
         if self.skip_line != 1:
             fiq_iq = boss.get_first_in_queue_id()
             if fiq_iq and member.discord_id != fiq_iq:
-                await message.channel.send(
-                    f"You don't have priority to hit this boss {member.discord_member.mention}",
-                    delete_after=5,
-                )
-                return False
+                return ErrorMessage.NO_PRIO
         member._of_status = "of" in args or member.of_status
         boss.hitting_member_id = member.discord_id
         member._hitting_boss_number = boss.number
-        self.dequeue(member.discord_id, message)
+        self.dequeue(member, boss)
         boss.queue_timeout = None
         member._save()
         boss._save()
-        return True
+        return None
 
-    async def syncing(self, member_id: int, sync_member_id: int, message, *args):
-        member = self.find_member(member_id)
-        sync_member = self.find_member(sync_member_id)
-        boss = self.find_boss(message.id)
-        if not member:
-            return False
+    def syncing(
+        self, member: cb.Member, sync_member: cb.Member, boss, *args
+    ) -> ErrorMessage | NoticeMessage | None:
         if not member.hitting_boss_number:
-            if not await self.hitting(member_id, message, *args):
-                return False
-        if not (sync_member and boss):
-            return False
+            if error := self.hitting(member, boss, *args):
+                return error
         if sync_member.hitting_boss_number:
-            await message.channel.send(
-                f"{sync_member.name} is already hitting B{sync_member.hitting_boss_number} {member.discord_member.mention}",
-                delete_after=7,
-            )
-            return False
+            return ErrorMessage.SYNC_ALREADY_HITTING
         if boss.syncing_member_id is not None:
             old_sync_member = self.find_member(boss.syncing_member_id)
             if old_sync_member is not None:
-                old_sync_member._hitting_boss_number = 0
+                old_sync_member._hitting_boss_number = None
                 old_sync_member._save()
         boss.syncing_member_id = sync_member.discord_id
         sync_member._hitting_boss_number = boss.number
-        self.dequeue(sync_member.discord_id, message)
+        self.dequeue(sync_member, boss)
         boss.queue_timeout = None
         sync_member._save()
         boss._save()
-        return True
+        return NoticeMessage.SYNC
 
-    def cancel_hit(self, member_id: int):
-        member = self.find_member(member_id)
-        if not member:
-            return False
-        boss = self.find_boss(member.hitting_boss_number)
+    def cancel_hit(self, member: cb.Member) -> cb.Boss | None:
+        boss = self.find_boss(boss_number=member.hitting_boss_number)
         if not boss:
-            return False
-        if member.hitting_boss_number == boss.number:
-            if boss.hitting_member_id == member.discord_id:
-                boss.hitting_member_id = 0
-                sync_member = self.find_member(boss.syncing_member_id)
-                if sync_member:
-                    sync_member._hitting_boss_number = 0
-                    sync_member._save()
-                boss.syncing_member_id = 0
-            elif boss.syncing_member_id == member.discord_id:
-                boss.syncing_member_id = 0
-            member._hitting_boss_number = 0
-            if boss.get_first_in_queue_id():
-                boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
-            member._save()
-            boss._save()
-            return boss
+            return None
+        if boss.hitting_member_id == member.discord_id:
+            boss.hitting_member_id = 0
+            sync_member = self.find_member(boss.syncing_member_id)
+            if sync_member:
+                sync_member._hitting_boss_number = 0
+                sync_member._save()
+            boss.syncing_member_id = 0
+        elif boss.syncing_member_id == member.discord_id:
+            boss.syncing_member_id = 0
+        member._hitting_boss_number = 0
+        if boss.get_first_in_queue_id():
+            boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
+        member._save()
+        boss._save()
+        return boss
 
-    async def done(self, member_id: int, message, *args):
-        member = self.find_member(member_id)
+    def done(self, member: cb.Member, *args) -> ErrorMessage | NoticeMessage:
+        ret = NoticeMessage.EMPTY
         if member is not None:
-            boss = self.find_boss(member.hitting_boss_number)
+            boss = self.find_boss(boss_number=member.hitting_boss_number)
         if member is not None and boss is not None:
-            if args:
-                parsedDmg = re.match(
-                    r"^([0-9]+\.?[0-9]*([mk])?)", args[0].replace(",", ".")
-                )
-                if parsedDmg is None:
-                    return False
-                dmg = min(replace_num(parsedDmg.group(0)), boss.hp)
-                if dmg:
-                    await message.add_reaction(emoji.ok)
-                    member._of_status = "of" in args or member.of_status
-                    if not member.of_status and member.remaining_hits <= 0:
-                        await message.channel.send(
-                            f"You don't have any hits left {member.discord_member.mention}\nYour hit was counted as Overflow",
-                            delete_after=7,
-                        )
-                        member.of_status = True
-                    of = member._of_status
-                    boss_is_dead = member.deal_damage(dmg, boss)
-                    self.add_damage_log(boss, member, dmg, of, boss_is_dead)
-                    setattr(
-                        self,
-                        f"d{self.day}_dmg",
-                        getattr(self, f"d{self.day}_dmg") + dmg,
-                    )
-                    self.drive_update()
-                    if (
-                        boss.hitting_member_id == 0
-                    ):  # if no hitter confirmed within recieve damage
-                        boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
-                else:
-                    await message.reply(
-                        f"Damages not found {member.discord_member.mention}\nUse `{BotConfig.PREFIX}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
-                        delete_after=7,
-                    )
-            else:
-                await message.reply(
-                    f"Argument not found {member.discord_member.mention}\nUse `{BotConfig.PREFIX}done <damage dealt>` to register your hit.\nNumbers ending with K and M are also supported",
-                    delete_after=7,
-                )
+            if not args:
+                return ErrorMessage.NO_ARGS
+            parsedDmg = re.match(
+                r"^([0-9]+\.?[0-9]*([mk])?)", args[0].replace(",", ".")
+            )
+            if parsedDmg is None:
+                return ErrorMessage.NO_DAMAGE
+            dmg = min(replace_num(parsedDmg.group(0)), boss.hp)
+            if not dmg:
+                return ErrorMessage.NO_DAMAGE
+            member._of_status = "of" in args or member.of_status
+            if not member.of_status and member.remaining_hits <= 0:
+                member.of_status = True
+                ret = NoticeMessage.NO_HITS_LEFT
+            of = member._of_status
+            boss_is_dead = member.deal_damage(dmg, boss)
+            self.add_damage_log(boss, member, dmg, of, boss_is_dead)
+            setattr(
+                self,
+                f"d{self.day}_dmg",
+                getattr(self, f"d{self.day}_dmg") + dmg,
+            )
+            self.drive_update()
+            if (
+                boss.hitting_member_id == 0
+            ):  # if no hitter confirmed within recieve damage
+                boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
+            return ret
         else:
             if member is not None:
-                await message.channel.send(
-                    f"You must claim a hit before registering damages {member.discord_member.mention}\nFor example use `{BotConfig.PREFIX}h b1` to claim a hit on b1.",
-                    delete_after=7,
-                )
+                return ErrorMessage.NOT_CLAIMED
 
-    async def queue(self, member_id: int, message, *args):
-        member = self.find_member(member_id)
-        boss = self.find_boss(message.id)
-        if not (member and boss):
-            return
+    def queue(self, member: cb.Member, boss: cb.Boss, *args) -> ErrorMessage | None:
         if member.hitting_boss_number == boss.number:
-            return await message.channel.send(
-                f"You can't queue a boss you are hitting {member.discord_member.mention}",
-                delete_after=7,
-            )
+            return ErrorMessage.QUEUE_ALREADY_HITTING
 
         c = self.db._c
         already_in_queue = c.execute(
             f"SELECT * from queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}"
         ).fetchone()
         if already_in_queue:
-            return await message.channel.send(
-                f"You are already in the queue {member.discord_member.mention}",
-                delete_after=7,
-            )
+            return ErrorMessage.ALREADY_QUEUED
 
         if "of" in args:
             member.of_status = True
@@ -301,30 +244,27 @@ class Clan:
         )
         c.execute("INSERT INTO queue VALUES (?,?,?,?,?,?,?)", data)
         self.db._conn.commit()
+        return None
 
-    def check_queue(self, message):
-        boss = self.find_boss(message.id)
-        if not boss:
-            return
+    def check_queue(self, boss: cb.Boss):
         if boss.queue_timeout and (
             (boss.queue_timeout - jst_time()).total_seconds() <= 0
         ):
-            first_in_queue_id = boss.get_first_in_queue_id()
-            self.dequeue(first_in_queue_id, message)
+            first_in_queue_member_id = boss.get_first_in_queue_id()
+            fiq_member = self.find_member(first_in_queue_member_id)
+            if fiq_member is not None:
+                self.dequeue(fiq_member, boss)
 
-    def dequeue(self, member_id: int, message):
-        member = self.find_member(member_id)
-        boss = self.find_boss(message.id)
-        if not (member and boss):
-            return
+    def dequeue(self, member: cb.Member, boss: cb.Boss) -> ErrorMessage | None:
         c = self.db._c
         c.execute(
             f"DELETE FROM queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}"
         )
         self.db._conn.commit()
         fiq_id = boss.get_first_in_queue_id()
-        if fiq_id and fiq_id == member_id:
+        if fiq_id and fiq_id == member.discord_id:
             boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
+        return None
 
     def add_member(self, member):
         c = self.db._c
@@ -351,11 +291,12 @@ class Clan:
                 return member
         return None
 
-    def find_boss(self, message_id_or_boss_number: int) -> cb.Boss | None:
+    def find_boss(
+        self, boss_number: int | None = None, message_id: int | None = None
+    ) -> cb.Boss | None:
         for boss in self.bosses:
-            if (
-                boss._message_id == message_id_or_boss_number
-                or boss.number == message_id_or_boss_number
+            if (message_id is not None and boss._message_id == message_id) or (
+                boss_number is not None and boss.number == boss_number
             ):
                 return boss
         return None
@@ -396,7 +337,7 @@ class Clan:
         hit = self.find_last_damage_log(member.discord_id)
         if not hit:
             return None
-        boss = self.find_boss(hit["boss_number"])
+        boss = self.find_boss(boss_number=hit["boss_number"])
 
         boss_hits = boss.get_damage_log()
         p_boss_hits = boss.get_damage_log(wave_offset=-1)
@@ -408,7 +349,7 @@ class Clan:
                     f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}'
                 )
                 self.db._conn.commit()
-                boss.hp += hit["damage"]
+                boss._hp += hit["damage"]
                 member.remaining_hits += (hit["overflow"] + 1) % 2
                 member.of_number += hit["overflow"]
                 member.of_status = bool(hit["overflow"])

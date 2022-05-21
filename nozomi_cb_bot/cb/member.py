@@ -24,7 +24,7 @@ class Member:
     _b3_hits: int
     _b4_hits: int
     _b5_hits: int
-    _hitting_boss_number: int
+    _hitting_boss_number: int | None
     _of_status: bool
     _of_number: int
     _missed_hits: int
@@ -81,11 +81,11 @@ class Member:
         return self._b5_hits
 
     @property
-    def hitting_boss_number(self) -> int:
+    def hitting_boss_number(self) -> int | None:
         return self._hitting_boss_number
 
     @hitting_boss_number.setter
-    def hitting_boss_number(self, boss_number: int) -> None:
+    def hitting_boss_number(self, boss_number: int | None) -> None:
         self._hitting_boss_number = boss_number
 
     @property
