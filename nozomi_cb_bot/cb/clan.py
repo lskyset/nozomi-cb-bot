@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import re
-import time
 from dataclasses import dataclass, field
 from functools import reduce
 from typing import TYPE_CHECKING
@@ -11,7 +10,6 @@ import discord
 import pytz
 
 from nozomi_cb_bot.config import CB_DATA, ClanConfig, PricoCbData, jst_time
-from nozomi_cb_bot.db.util import replace_num
 from nozomi_cb_bot.protocols.database import CbDatabase
 from nozomi_cb_bot.response_messages import ErrorMessage, NoticeMessage
 
@@ -22,7 +20,7 @@ if TYPE_CHECKING:
 @dataclass
 class Clan:
     config: ClanConfig
-    db: CbDatabase
+    _db: CbDatabase
     cb_data: PricoCbData
     bosses: list[cb.Boss] = field(default_factory=list)
     members: list[cb.Member] = field(default_factory=list)
@@ -38,24 +36,14 @@ class Clan:
         self.skip_line = 0
         self.timeout_minutes = 0
 
-        # if not bot_config.DISABLE_DRIVE and self.google_drive_sheet:
-        #     self.gs_sheet = gc.open_by_key(self.google_drive_sheet["SHEET_KEY"])
-        #     self.gs_db = self.gs_sheet.worksheet(
-        #         self.google_drive_sheet["DATA_WORKSHEET_NAME"]
-        #     )
-        #     self.gs_chat_log = self.gs_sheet.worksheet(
-        #         self.google_drive_sheet["CHAT_LOG_WORKSHEET_NAME"]
-        #     )
-        self.drive_loading = False
-
-        c = self.db._c
+        c = self._db._c
         data = c.execute("SELECT * from cb_data").fetchone()
         if data:
             columns = c.execute("PRAGMA table_info(cb_data)").fetchall()
             for column in columns:
                 if data[column[0]] is not None:
                     setattr(self, column[1], data[column[0]])
-        self.bosses = self.db.get_bosses(self)
+        self.bosses = self._db.get_all_bosses(self)
 
     @property
     def overview_message(self) -> discord.Message | None:
@@ -88,23 +76,14 @@ class Clan:
         )
 
     def _save(self):
-        self.db.save_clan(self)
+        self._db.save_clan(self)
 
-    def full_update(self):
+    def save(self):
         for member in self.members:
             member._save()
         for boss in self.bosses:
             boss._save()
         self._save()
-
-    def drive_update(self):
-        while self.drive_loading:
-            time.sleep(1)
-        self.drive_loading = True
-        self.full_update()
-        # if not bot_config.DISABLE_DRIVE:
-        #     update_db(self.drive, self)
-        self.drive_loading = False
 
     def hitting(self, member: cb.Member, boss: cb.Boss, *args) -> ErrorMessage | None:
         if boss.wave - self.wave > 1 or boss.tier != self.tier:
@@ -194,9 +173,9 @@ class Clan:
                 f"d{self.day}_dmg",
                 getattr(self, f"d{self.day}_dmg") + dmg,
             )
-            self.drive_update()
+            self.save()
             if (
-                boss.hitting_member_id == 0
+                boss.hitting_member_id is None
             ):  # if no hitter confirmed within recieve damage
                 boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
             return ret
@@ -208,7 +187,7 @@ class Clan:
         if member.hitting_boss_number == boss.number:
             return ErrorMessage.QUEUE_ALREADY_HITTING
 
-        c = self.db._c
+        c = self._db._c
         already_in_queue = c.execute(
             f"SELECT * from queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}"
         ).fetchone()
@@ -243,7 +222,7 @@ class Clan:
             queue_wave,
         )
         c.execute("INSERT INTO queue VALUES (?,?,?,?,?,?,?)", data)
-        self.db._conn.commit()
+        self._db._conn.commit()
         return None
 
     def check_queue(self, boss: cb.Boss):
@@ -256,32 +235,35 @@ class Clan:
                 self.dequeue(fiq_member, boss)
 
     def dequeue(self, member: cb.Member, boss: cb.Boss) -> ErrorMessage | None:
-        c = self.db._c
+        c = self._db._c
         c.execute(
             f"DELETE FROM queue WHERE boss_number = {boss.number} AND member_id = {member.discord_id}"
         )
-        self.db._conn.commit()
+        self._db._conn.commit()
         fiq_id = boss.get_first_in_queue_id()
         if fiq_id and fiq_id == member.discord_id:
             boss.queue_timeout = jst_time(minutes=self.timeout_minutes)
         return None
 
-    def add_member(self, member):
-        c = self.db._c
-        data = (member.id, member.display_name)
-        c.execute(
-            "INSERT INTO members_data VALUES (?,?,3, 0, 0, 0, 0, 0, 0, 0, False, 0, 0)",
-            data,
-        )
-        c.execute(
-            "INSERT INTO missed_hits_data VALUES (?,?,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
-            data,
-        )
-        self.members.append(cb.Member(member.id, self.db._conn))
-        self.db._conn.commit()
+    def init_members(self, members: list[discord.Member]) -> None:
+        for member in members:
+            member_from_db = self._db.get_member(self, member)
+            if member_from_db is None:
+                self.add_member(member)
+            else:
+                self.members.append(member_from_db)
 
-    def add_members(self, members: list[discord.Member]):
-        self.members = self.db.get_members(self, members)
+    def add_member(self, member: discord.Member) -> None:
+        if self.find_member(member.id) is None:
+            self.members.append(self._db.add_member(self, member))
+
+    def add_members(self, members: list[discord.Member]) -> None:
+        new_members = [
+            new_member
+            for new_member in members
+            if self.find_member(new_member.id) is None
+        ]
+        self.members += self._db.add_members(self, new_members)
 
     def find_member(self, member_id: int | None) -> cb.Member | None:
         if member_id is None:
@@ -304,7 +286,7 @@ class Clan:
     def add_damage_log(
         self, boss: cb.Boss, member: cb.Member, damage: int, overflow=False, dead=False
     ):
-        c = self.db._c
+        c = self._db._c
         data = (
             boss.number,
             boss.wave - 1 * dead,
@@ -318,7 +300,7 @@ class Clan:
         c.execute("INSERT INTO damage_log VALUES (?,?,?,?,?,?,?,?)", data)
 
     def find_last_damage_log(self, member_id: int):
-        c = self.db._c
+        c = self._db._c
         logs = c.execute(
             f"SELECT * from damage_log WHERE member_id = {member_id} ORDER BY timestamp"
         ).fetchall()
@@ -344,11 +326,11 @@ class Clan:
 
         if boss_hits:
             if hit == boss_hits[-1]:
-                c = self.db._c
+                c = self._db._c
                 c.execute(
                     f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}'
                 )
-                self.db._conn.commit()
+                self._db._conn.commit()
                 boss._hp += hit["damage"]
                 member.remaining_hits += (hit["overflow"] + 1) % 2
                 member.of_number += hit["overflow"]
@@ -358,11 +340,11 @@ class Clan:
                 return boss
         elif p_boss_hits:
             if hit == p_boss_hits[-1]:
-                c = self.db._c
+                c = self._db._c
                 c.execute(
                     f'DELETE FROM damage_log WHERE timestamp = {hit["timestamp"]} AND member_id = {hit["member_id"]}'
                 )
-                self.db._conn.commit()
+                self._db._conn.commit()
                 boss._hp = hit["damage"]
                 boss._wave -= 1
                 member.remaining_hits += (hit["overflow"] + 1) % 2
@@ -381,14 +363,11 @@ class Clan:
         return None
 
     def daily_reset(self):
-        self.day = math.ceil(
-            (jst_time() - CB_DATA.START_DATE).total_seconds() / 60 / 60 / 24
-        )
         prev_day = self.day - 1
         if prev_day < 1 or prev_day > 5:
             return
         print(f"\nDay {prev_day} hits :")
-        c = self.db._c
+        c = self._db._c
         for member in self.members:
             data = list(
                 c.execute(
@@ -414,8 +393,7 @@ class Clan:
             member.remaining_hits = 3
             member.of_status = False
             member.of_number = 0
-            member._save()
-        self.drive_update()
+        self.save()
 
     def log(self, message):
         if message.content:
@@ -423,6 +401,12 @@ class Clan:
                 "%m/%d/%Y %H:%M:%S"
             )
             log = (jst, message.author.display_name, message.clean_content)
-            c = self.db._c
+            c = self._db._c
             c.execute("INSERT INTO chat_log VALUES (?,?,?)", log)
-            self.db._conn.commit()
+            self._db._conn.commit()
+
+
+def replace_num(num):
+    if num[-1] in ["k", "m"]:
+        return int(float(num[:-1]) * 10 ** (3 + 3 * (num[-1] == "m")))
+    return int(float(num))

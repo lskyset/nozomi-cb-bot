@@ -15,7 +15,7 @@ class BotConfig:
 
 
 @dataclass(frozen=True)
-class GoogleDriveConfig:
+class GoogleSpreadsheetConfig:
     SHEET_KEY: str
     CHAT_LOG_WORKSHEET_NAME: str
     DATA_WORKSHEET_NAME: str
@@ -31,11 +31,13 @@ class ClanConfig:
     CLAN_ENV: int = BotConfig.DEFAULT_BOT_ENV
     timeout_minutes: int = 15
     skip_line: int = 0
-    GOOGLE_DRIVE_CONFIG: GoogleDriveConfig | dict | None = None
+    GOOGLE_SHEET_CONFIG: GoogleSpreadsheetConfig | dict | None = None
 
     def __post_init__(self) -> None:
-        if type(self.GOOGLE_DRIVE_CONFIG) is dict:
-            self.GOOGLE_DRIVE_CONFIG = GoogleDriveConfig(**self.GOOGLE_DRIVE_CONFIG)
+        if type(self.GOOGLE_SHEET_CONFIG) is dict:
+            self.GOOGLE_SHEET_CONFIG = GoogleSpreadsheetConfig(
+                **self.GOOGLE_SHEET_CONFIG
+            )
 
 
 def mock_ClanConfig(
@@ -96,4 +98,9 @@ def mock_PricoCbData(
     )
 
 
+def jst_time():
+    return datetime.datetime.now()
+
+
 CB_DATA = mock_PricoCbData()
+# GC, DRIVE = (None, None)

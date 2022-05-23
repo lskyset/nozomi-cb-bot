@@ -24,12 +24,12 @@ class Boss:
     _cb_data: PricoCbData
     _db: CbDatabase
     clan: cb.Clan
+    _message: discord.Message | None = None
 
     def __post_init__(self):
         self._queue_timeout: datetime | None = (
             None  # cfg.jst_time(minutes=clan.timeout_minutes)
         )
-        self._message: discord.Message | None = None
 
     @property
     def number(self) -> int:

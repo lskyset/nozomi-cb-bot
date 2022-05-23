@@ -4,11 +4,37 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+import gspread
 import pytz
 from dotenv import load_dotenv
+from oauth2client.service_account import ServiceAccountCredentials
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 print("Loading .env environment variables...")
 load_dotenv(override=True)
+
+
+def connect_to_drive() -> tuple[gspread.Client, GoogleDrive] | tuple[None, None]:
+    json_creds = os.getenv("JSON_CREDS")
+    txt_creds = os.getenv("TXT_CREDS")
+    if json_creds is None or txt_creds is None:
+        return (None, None)
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(json_creds, scope)
+    gc = gspread.authorize(creds)
+    gauth = GoogleAuth()
+    gauth.LoadCredentialsFile(txt_creds)
+    drive = GoogleDrive(gauth)
+    return (gc, drive)
+
+
+GC: gspread.Client
+Drive: GoogleDrive
+GC, DRIVE = connect_to_drive()
 
 
 @dataclass(frozen=True)
@@ -20,7 +46,7 @@ class BotConfig:
 
 
 @dataclass(frozen=True)
-class GoogleDriveConfig:
+class GoogleSpreadsheetConfig:
     """Represents a `GoogleDriveDatabase` configuration inside a `ClanConfig` configuration class."""
 
     SHEET_KEY: str
@@ -40,11 +66,13 @@ class ClanConfig:
     CLAN_ENV: int = BotConfig.DEFAULT_BOT_ENV
     timeout_minutes: int = 15
     skip_line: int = 0
-    GOOGLE_DRIVE_CONFIG: GoogleDriveConfig | dict | None = None
+    GOOGLE_SHEET_CONFIG: GoogleSpreadsheetConfig | dict | None = None
 
     def __post_init__(self) -> None:
-        if type(self.GOOGLE_DRIVE_CONFIG) is dict:
-            self.GOOGLE_DRIVE_CONFIG = GoogleDriveConfig(**self.GOOGLE_DRIVE_CONFIG)
+        if type(self.GOOGLE_SHEET_CONFIG) is dict:
+            self.GOOGLE_SHEET_CONFIG = GoogleSpreadsheetConfig(
+                **self.GOOGLE_SHEET_CONFIG
+            )
 
 
 @dataclass(frozen=True)
@@ -137,8 +165,8 @@ _CB_TIER_THRESHOLD = _get_tier_treshold(_CB_ID)
 _CB_BOSSES = _get_bosses_data(_CB_ID, _CB_TIER_THRESHOLD)
 
 if BotConfig().BOT_ENV:
-    _CB_START_DATE = jst_time()
-    _CB_END_DATE = jst_time(minutes=(60 * 24 * 4 + 60 * 19 - 1), seconds=59)
+    _CB_START_DATE = jst_time(minutes=(-60 * 24))
+    _CB_END_DATE = jst_time(minutes=(60 * 24 * 3 + 60 * 19 - 1), seconds=59)
 else:
     tz = pytz.timezone("Japan")
     _CB_START_DATE = datetime.strptime(_DB_START_DATE, "%Y/%m/%d %H:%M:%S").replace(
