@@ -29,14 +29,14 @@ class Nozomi(commands.Bot):
         for clan in self.clan_manager.clans:
             if not (channel := self.get_channel(clan.config.CHANNEL_ID)):
                 continue
-            clan.add_members(channel.guild.get_role(clan.config.CLAN_ROLE_ID).members)
+            clan.init_members(channel.guild.get_role(clan.config.CLAN_ROLE_ID).members)
             clan.is_daily_reset = False
         await self.start_uis()
         number_of_clans = len(self.clan_manager.clans)
         print(f"{number_of_clans} Clan{'s' * (number_of_clans > 1)} loaded.")
-        MY_GUILD = discord.Object(id=796792048882548756)
-        self.tree.copy_global_to(guild=MY_GUILD)
-        await self.tree.sync(guild=MY_GUILD)
+        # MY_GUILD = discord.Object(id=)
+        # self.tree.copy_global_to(guild=MY_GUILD)
+        # await self.tree.sync(guild=MY_GUILD)
 
     async def setup_hook(self) -> None:
         await self.load_commands()

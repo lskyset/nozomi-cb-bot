@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import discord
 
-from nozomi_cb_bot.cb.boss import Boss
 from nozomi_cb_bot.config import PricoCbData
 from nozomi_cb_bot.protocols.database import CbDatabase
 
@@ -46,8 +45,9 @@ class Member:
         return self._remaining_hits
 
     @remaining_hits.setter
-    def remaining_hits(self, remaining_hit_number: int) -> None:
-        self._remaining_hits = remaining_hit_number
+    def remaining_hits(self, number: int) -> None:
+        self._remaining_hits = number
+        self._save()
 
     @property
     def total_hits(self) -> int:
@@ -87,6 +87,7 @@ class Member:
     @hitting_boss_number.setter
     def hitting_boss_number(self, boss_number: int | None) -> None:
         self._hitting_boss_number = boss_number
+        self._save()
 
     @property
     def of_status(self) -> bool:
@@ -95,14 +96,25 @@ class Member:
     @of_status.setter
     def of_status(self, status: bool) -> None:
         self._of_status = status
+        self._save()
 
     @property
     def of_number(self) -> int:
         return self._of_number
 
+    @of_number.setter
+    def of_number(self, number: int) -> None:
+        self._of_number = number
+        self._save()
+
     @property
     def missed_hits(self) -> int:
         return self._missed_hits
+
+    @missed_hits.setter
+    def missed_hits(self, number: int) -> None:
+        self._missed_hits = number
+        self._save()
 
     @property
     def discord_member(self) -> discord.Member:
@@ -118,7 +130,7 @@ class Member:
     def _save(self):
         self._db.save_member(self)
 
-    def deal_damage(self, damage, boss: Boss):
+    def deal_damage(self, damage, boss: cb.Boss):
         boss_is_dead = boss.recieve_damage(damage, self._discord_id)
         setattr(
             self, f"_b{boss.number}_hits", getattr(self, f"_b{boss.number}_hits") + 1

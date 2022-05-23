@@ -3,7 +3,7 @@ import os
 
 from nozomi_cb_bot.cb.clan import Clan
 from nozomi_cb_bot.config import CB_DATA, ClanConfig
-from nozomi_cb_bot.db.sqlite_db import SqliteDatabase
+from nozomi_cb_bot.db import GoogleDriveDatabase, SqliteDatabase
 
 # from nozomi_cb_bot.db.google_drive_db import GoogleDriveDatabase
 
@@ -40,10 +40,11 @@ class ClanManager:
             )
         if clan_config.CLAN_ENV > 0:
             clan_config.name += "_dev"
-        # if (clan_config.GOOGLE_DRIVE_CONFIG is None):
-        clan_db = SqliteDatabase(clan_config, CB_DATA)
-        # else:
-        #     clan_db = GoogleDriveDatabase(clan_config, CB_DATA)
+        clan_db: SqliteDatabase | GoogleDriveDatabase
+        if clan_config.GOOGLE_SHEET_CONFIG is None:
+            clan_db = SqliteDatabase(clan_config, CB_DATA)
+        else:
+            clan_db = GoogleDriveDatabase(clan_config, CB_DATA)
         clan = Clan(clan_config, clan_db, CB_DATA)
         self._clans.append(clan)
         return clan

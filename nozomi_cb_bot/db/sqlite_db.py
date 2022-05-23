@@ -14,20 +14,20 @@ class SqliteDatabase:
 
         self._db_path = f"{clan_config.name}.db"
         if not os.path.exists(self._db_path):
-            self.connect()
+            self._connect()
             self._create_tables()
-            self.initialize_cb()
+            self._initialize_cb()
             print(f"Created {self._db_path}")
         else:
-            self.connect()
+            self._connect()
 
-    def connect(self, path: str | None = None) -> None:
+    def _connect(self, path: str | None = None) -> None:
         if path:
             self._db_path = path
         self._conn = sqlite3.connect(self._db_path)
         self._c = self._conn.cursor()
 
-    def initialize_cb(self) -> None:
+    def _initialize_cb(self) -> None:
         self._c.execute(
             "INSERT INTO cb_data VALUES (?, ?, ?, null, 0, 0, 0, 0, 0)",
             (
@@ -43,7 +43,7 @@ class SqliteDatabase:
             )
         self._save()
 
-    def save_clan(self, clan: cb.Clan):
+    def save_clan(self, clan: cb.Clan) -> None:
         self._c.execute(
             """UPDATE cb_data SET
                     name = ?,
@@ -67,29 +67,74 @@ class SqliteDatabase:
                 clan.d5_dmg,
             ),
         )
+        self._save()
 
-    def get_boss_from_message_id(self, clan: cb.Clan, message_id: int) -> cb.Boss:
+    def _get_boss_data(self, message_id):
+        data = self._c.execute(
+            "SELECT * from boss_data where message_id = ?", (message_id,)
+        ).fetchone()
+        if not data:
+            return None
+        return data
+
+    def get_boss(self, clan: cb.Clan, message: discord.Message) -> cb.Boss | None:
+        boss_data = self._get_boss_data(message.id)
+        if boss_data is None:
+            return None
         return cb.Boss(  # type: ignore
-            *self._c.execute(
-                "SELECT * from boss_data where message_id = ?", (message_id,)
-            ).fetchone(),
+            *boss_data,
             self._cb_data,
             self,
             clan,
+            message,
         )
 
-    def get_bosses(self, clan: cb.Clan) -> list[cb.Boss]:
+    def get_all_bosses(self, clan: cb.Clan) -> list[cb.Boss] | None:
+        bosses_data = self._c.execute("SELECT * from boss_data").fetchall()
+        if not bosses_data:
+            return None
         return [
             cb.Boss(  # type: ignore
-                *db_boss_data,
+                *boss_data,
                 self._cb_data,
                 self,
                 clan,
             )
-            for db_boss_data in self._c.execute("SELECT * from boss_data").fetchall()
+            for boss_data in bosses_data
         ]
 
-    def add_member(self, clan: cb.Clan, member: discord.Member) -> cb.Member:
+    def _save_boss(self, boss: cb.Boss, save: bool) -> None:
+        self._c.execute(
+            """UPDATE boss_data SET
+                    wave = ?,
+                    hp = ?,
+                    message_id = ?,
+                    hitting_member_id = ?,
+                    syncing_member_id = ?
+                WHERE number = ?""",
+            (
+                boss.wave,
+                boss.hp,
+                boss.message_id,
+                boss.hitting_member_id,
+                boss.syncing_member_id,
+                boss.number,
+            ),
+        )
+        if save:
+            self._save()
+
+    def save_boss(self, boss: cb.Boss) -> None:
+        return self._save_boss(boss, save=True)
+
+    def save_bosses(self, bosses: list[cb.Boss]) -> None:
+        for boss in bosses:
+            self._save_boss(boss, save=False)
+        self._save()
+
+    def _add_member(
+        self, clan: cb.Clan, member: discord.Member, save: bool
+    ) -> cb.Member:
         member_data = (
             member.id,
             member.display_name,
@@ -120,56 +165,50 @@ class SqliteDatabase:
             "INSERT INTO missed_hits_data VALUES (?,?,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
             (member.id, member.display_name),
         )
+        if save:
+            self._save()
         return cb_member
+
+    def add_member(self, clan: cb.Clan, member: discord.Member) -> cb.Member:
+        return self._add_member(clan, member, save=True)
+
+    def add_members(
+        self, clan: cb.Clan, members: list[discord.Member]
+    ) -> list[cb.Member]:
+        ret = [self._add_member(clan, member, save=False) for member in members]
+        self._save()
+        return ret
+
+    def _get_member_data(self, member_id: int) -> list | None:
+        data = self._c.execute(
+            f"SELECT * from members_data WHERE discord_id = {member_id}"
+        ).fetchone()
+        if not data:
+            return None
+        return data
+
+    def get_member(self, clan: cb.Clan, member: discord.Member) -> cb.Member | None:
+        member_data = self._get_member_data(member.id)
+        if member_data is None:
+            return None
+        return cb.Member(  # type: ignore
+            *member_data,
+            self._cb_data,
+            self,
+            clan,
+            member,
+        )
 
     def get_members(
         self, clan: cb.Clan, members: list[discord.Member]
     ) -> list[cb.Member]:
-        member_list = []
+        ret = []
         for member in members:
-            member_data: tuple = self._c.execute(
-                f"SELECT * from members_data WHERE discord_id = {member.id}"
-            ).fetchone()
-            if not member_data:
-                member_list.append(self.add_member(clan, member))
-            else:
-                member_list.append(
-                    cb.Member(  # type: ignore
-                        *member_data,
-                        self._cb_data,
-                        self,
-                        clan,
-                        member,
-                    )
-                )
-        return member_list
+            if clan_member := self.get_member(clan, member):
+                ret.append(clan_member)
+        return ret
 
-    def save_boss(self, boss: cb.Boss) -> None:
-        self._c.execute(
-            """UPDATE boss_data SET
-                    wave = ?,
-                    hp = ?,
-                    message_id = ?,
-                    hitting_member_id = ?,
-                    syncing_member_id = ?
-                WHERE number = ?""",
-            (
-                boss.wave,
-                boss.hp,
-                boss.message_id,
-                boss.hitting_member_id,
-                boss.syncing_member_id,
-                boss.number,
-            ),
-        )
-
-        self._save()
-
-    def save_bosses(self, bosses: list[cb.Boss]) -> None:
-        for boss in bosses:
-            self.save_boss(boss)
-
-    def save_member(self, member: cb.Member):
+    def save_member(self, member: cb.Member) -> None:
         self._c.execute(
             """UPDATE members_data SET
                     name = ?,
@@ -203,7 +242,7 @@ class SqliteDatabase:
         )
         self._save()
 
-    def save_members(self, members: list[cb.Member]):
+    def save_members(self, members: list[cb.Member]) -> None:
         for member in members:
             self.save_member(member)
 

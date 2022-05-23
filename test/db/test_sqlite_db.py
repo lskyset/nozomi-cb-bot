@@ -11,6 +11,7 @@ def sqlite_db(mocker, mock_sqlite3):
     sys.modules["sqlite3"] = mock_sqlite3
     sys.modules["discord"] = mocker.MagicMock()
     sys.modules["nozomi_cb_bot.cb"] = mocker.MagicMock()
+    sys.modules["nozomi_cb_bot.db.googledrive_db"] = mocker.MagicMock()
     sys.modules["nozomi_cb_bot.config"] = mock_config
     from nozomi_cb_bot.db import sqlite_db
 
@@ -44,12 +45,12 @@ class Test_SqliteDatabase:
         init.assert_called_once_with(dsdb, clan_config, cb_data)
 
     def test_connect(self, sqlite_db, mocker):
-        connect = mocker.spy(sqlite_db.SqliteDatabase, "connect")
+        connect = mocker.spy(sqlite_db.SqliteDatabase, "_connect")
         dsdb = default_SqliteDatabase(sqlite_db)
         connect.assert_called_once_with(dsdb)
 
     def test_initialize_cb(self, sqlite_db, mocker):
-        initialize_cb = mocker.spy(sqlite_db.SqliteDatabase, "initialize_cb")
+        initialize_cb = mocker.spy(sqlite_db.SqliteDatabase, "_initialize_cb")
         default_SqliteDatabase(sqlite_db)
         initialize_cb.assert_not_called()
 

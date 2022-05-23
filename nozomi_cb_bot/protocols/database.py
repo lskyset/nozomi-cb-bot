@@ -9,13 +9,13 @@ if TYPE_CHECKING:
 
 
 class CbDatabase(Protocol):
-    def connect(self, path: str | None = None):
-        ...
-
     def save_clan(self, clan: cb.Clan) -> None:
         ...
 
-    def get_bosses(self) -> list[cb.Boss]:
+    def get_boss(self, clan: cb.Clan, message: discord.Message) -> cb.Boss:
+        ...
+
+    def get_all_bosses(self, clan: cb.Clan) -> list[cb.Boss]:
         ...
 
     def save_boss(self, boss: cb.Boss) -> None:
@@ -24,10 +24,24 @@ class CbDatabase(Protocol):
     def save_bosses(self, bosses: list[cb.Boss]) -> None:
         ...
 
-    def get_member(self, member: cb.Member) -> cb.Member:
+    def add_member(self, clan: cb.Clan, member: discord.Member) -> cb.Member:
+        ...
+
+    def add_members(
+        self, clan: cb.Clan, members: list[discord.Member]
+    ) -> list[cb.Member]:
+        ...
+
+    def get_member(self, clan: cb.Clan, member: discord.Member) -> cb.Member:
         ...
 
     def get_members(
         self, clan: cb.Clan, members: list[discord.Member]
     ) -> list[cb.Member]:
+        ...
+
+    def save_member(self, member: cb.Member) -> None:
+        ...
+
+    def save_members(self, members: list[cb.Member]) -> None:
         ...
