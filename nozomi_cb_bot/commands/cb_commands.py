@@ -62,12 +62,12 @@ class CbCommands(commands.Cog, name="CB Commands"):  # type: ignore
         for boss in ctx.clan.bosses:
             if f"b{boss.number}" in args:
                 ctx.boss = boss
-        if boss is None:
+        if ctx.boss is None:
             return await command_error_respond(
                 ctx, ErrorMessage.NO_BOSS, HelpMessage.QUEUE
             )
 
-        if error := ctx.clan.queue(ctx.clan_member, boss, *args):
+        if error := ctx.clan.queue(ctx.clan_member, ctx.boss, *args):
             return await command_error_respond(ctx, error)
 
     @commands.command(aliases=("dq", "dque"))
