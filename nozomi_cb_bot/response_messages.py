@@ -70,8 +70,8 @@ def get_notice_message(ctx: commands.context, notice: NoticeMessage) -> str:
 
 async def bot_respond(ctx: commands.Context, content: str | None = None) -> None:
     if ctx.message.interaction is not None:
-        if ctx.edit_original_message:
-            return await ctx.message.interaction.edit_original_message(
+        if ctx.edit_original_response:
+            return await ctx.message.interaction.edit_original_response(
                 content=content, view=ctx.new_view
             )
         else:

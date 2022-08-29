@@ -12,7 +12,7 @@ class SqliteDatabase:
         self._clan_config = clan_config
         self._cb_data = cb_data
 
-        self._db_path = f"{clan_config.name}.db"
+        self._db_path = f"./volume/{clan_config.name}.db"
         if not os.path.exists(self._db_path):
             self._connect()
             self._create_tables()

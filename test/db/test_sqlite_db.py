@@ -41,7 +41,7 @@ class Test_SqliteDatabase:
         dsdb = sqlite_db.SqliteDatabase(clan_config, cb_data)
         assert dsdb._clan_config == clan_config
         assert dsdb._cb_data == cb_data
-        assert dsdb._db_path == f"{clan_config.name}.db"
+        assert dsdb._db_path == f"./volume/{clan_config.name}.db"
         init.assert_called_once_with(dsdb, clan_config, cb_data)
 
     def test_connect(self, sqlite_db, mocker):

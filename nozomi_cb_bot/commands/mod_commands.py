@@ -66,8 +66,8 @@ class ModCommands(commands.Cog, name="Mod Commands"):  # type: ignore
         clan = self.bot.clan_manager.find_clan_by_id(
             ctx.message.channel.guild.id, ctx.message.channel.id
         )
-        clan.drive_update()
-        clan.conn.close()
+        clan.save()
+        clan._db._conn.close()
         del self.bot.clans[self.bot.clans.index(clan)]
         await ctx.message.add_reaction(emoji.ok)
 
@@ -75,8 +75,8 @@ class ModCommands(commands.Cog, name="Mod Commands"):  # type: ignore
     async def shutdown(self, ctx):
         """Stops the bot"""
         for clan in self.bot.clans:
-            clan.drive_update()
-            clan.conn.close()
+            clan.save()
+            clan._db._conn.close()
         await ctx.message.add_reaction(emoji.ok)
         await self.bot.close()
 

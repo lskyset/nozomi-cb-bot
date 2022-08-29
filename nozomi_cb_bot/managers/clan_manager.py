@@ -50,14 +50,14 @@ class ClanManager:
         return clan
 
     def load_clans_from_config(
-        self, clans_config_file_path="clans_config.json"
+        self, clans_config_file_path="./volume/clans_config.json"
     ) -> None:
         """Creates new `Clan` instances from all the clans specified in the clan config file where `CLAN_ENV` matches the manager's `allowed_env` number and add them to the manager's `clans` list.
 
         Creates a default clans config file if the file doesn't exists."""
 
         if os.path.isfile(clans_config_file_path):
-            with open("clans_config.json", "r") as clans_cfg:
+            with open(clans_config_file_path, "r") as clans_cfg:
                 [
                     self.create_clan(ClanConfig(clan_name, **clan_config))
                     for clan_name, clan_config in json.load(clans_cfg).items()
