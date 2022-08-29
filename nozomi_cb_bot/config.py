@@ -11,7 +11,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
-os.makedirs("./volume")
+os.makedirs("./volume", exist_ok=True)
 print("Loading .env environment variables...")
 load_dotenv(find_dotenv("./volume/.env"))
 

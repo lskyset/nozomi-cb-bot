@@ -108,10 +108,7 @@ def compare_embeds(
                     old.footer.icon_url == new.footer.icon_url,
                     old.image.url == new.image.url,
                     old.colour == new.colour,
-                    compare_embed_fields(
-                        cast(list[discord.Embed], old.fields),
-                        cast(list[discord.Embed], new.fields),
-                    ),
+                    compare_embed_fields(old.fields, new.fields),
                 )
             )
         ):
@@ -120,8 +117,8 @@ def compare_embeds(
 
 
 def compare_embed_fields(
-    old_fields: list[discord.Embed],
-    new_fields: list[discord.Embed],
+    old_fields,
+    new_fields,
 ):
     for old, new in zip_longest(old_fields, new_fields, fillvalue=None):
         if not (
