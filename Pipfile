@@ -12,7 +12,7 @@ gspread = "*"
 pydrive = "*"
 oauth2client = "*"
 python-dotenv = "*"
-"discord.py" = {extras = ["voice"], git = "https://github.com/Rapptz/discord.py.git"}
+discord.py = "*"
 
 [dev-packages]
 black = "==20.8b1"

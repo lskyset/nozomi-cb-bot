@@ -26,7 +26,7 @@ class CbCommands(commands.Cog, name="CB Commands"):  # type: ignore
         )
         if ctx.clan:
             ctx.new_view = None
-            ctx.edit_original_message = False
+            ctx.edit_original_response = False
             ctx.bot = self.bot
             ctx.boss = None
             ctx.clan_member = ctx.clan.find_member(ctx.message.author.id)
@@ -140,7 +140,7 @@ class CbCommands(commands.Cog, name="CB Commands"):  # type: ignore
             for boss in ctx.clan.bosses:
                 if f"b{boss.number}" in args:
                     ctx.boss = boss
-        if boss is None:
+        if ctx.boss is None:
             return await command_error_respond(
                 ctx, ErrorMessage.NO_BOSS, HelpMessage.SYNC
             )
@@ -154,7 +154,7 @@ class CbCommands(commands.Cog, name="CB Commands"):  # type: ignore
     async def cancel(self, ctx: commands.Context):
         """ """
         ctx.boss = ctx.clan.cancel_hit(ctx.clan_member)
-        ctx.edit_original_message = True
+        ctx.edit_original_response = True
         if ctx.boss is None:
             return await command_error_respond(ctx, ErrorMessage.CANCEL)
         return await command_success_respond(ctx, ResponseMessage.CANCEL)
@@ -170,7 +170,7 @@ class CbCommands(commands.Cog, name="CB Commands"):  # type: ignore
         #     return
         args = tuple(map(str.lower, args))
         result = ctx.clan.done(ctx.clan_member, *args)
-        ctx.edit_original_message = True
+        ctx.edit_original_response = True
         if isinstance(result, ErrorMessage):
             return await command_error_respond(ctx, result, HelpMessage.DONE)
         await command_success_respond(ctx, ResponseMessage.DONE, result)

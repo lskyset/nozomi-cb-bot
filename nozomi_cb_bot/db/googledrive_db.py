@@ -16,7 +16,7 @@ class GoogleDriveDatabase:
 
         self._loading = False
 
-        self._db_path = f"{clan_config.name}.db"
+        self._db_path = f"volume/{clan_config.name}.db"
 
         if DRIVE is None:
             raise Exception("no drive found")

@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 
 import gspread
 import pytz
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from oauth2client.service_account import ServiceAccountCredentials
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
 print("Loading .env environment variables...")
-load_dotenv(override=True)
+load_dotenv(find_dotenv("./volume/.env"))
 
 
 def connect_to_drive() -> tuple[gspread.Client, GoogleDrive] | tuple[None, None]:
@@ -24,17 +24,16 @@ def connect_to_drive() -> tuple[gspread.Client, GoogleDrive] | tuple[None, None]
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(json_creds, scope)
+
+    GoogleAuth.DEFAULT_SETTINGS["client_config_file"] = "./volume/client_secrets.json"
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        f"./volume/{json_creds}", scope
+    )
     gc = gspread.authorize(creds)
     gauth = GoogleAuth()
-    gauth.LoadCredentialsFile(txt_creds)
+    gauth.LoadCredentialsFile(f"./volume/{txt_creds}")
     drive = GoogleDrive(gauth)
     return (gc, drive)
-
-
-GC: gspread.Client
-Drive: GoogleDrive
-GC, DRIVE = connect_to_drive()
 
 
 @dataclass(frozen=True)
@@ -96,15 +95,6 @@ class PricoCbData:
     BOSSES_DATA: list[BossData]
 
 
-print("Downloading master.db")
-_DB_URL = "https://github.com/lskyset/nozomi-cb-data/raw/main/master.db"
-_DB_NAME = "master.db"
-urllib.request.urlretrieve(_DB_URL, _DB_NAME)
-
-_conn = sqlite3.connect(_DB_NAME)
-_c = _conn.cursor()
-
-
 def _get_tier_treshold(cb_id: int) -> list[int]:
     data = _c.execute(
         f"SELECT phase from clan_battle_2_map_data where clan_battle_id={cb_id}"
@@ -157,9 +147,21 @@ def jst_time(minutes: int = 0, seconds: int = 0) -> datetime:
     return jst_now + timedelta(minutes=minutes, seconds=seconds)
 
 
+GC: gspread.Client
+Drive: GoogleDrive
+GC, DRIVE = connect_to_drive()
+
+print("Downloading master.db")
+_DB_URL = "https://github.com/lskyset/nozomi-cb-data/raw/main/master.db"
+_DB_PATH = "volume/master.db"
+urllib.request.urlretrieve(_DB_URL, _DB_PATH)
+
+_conn = sqlite3.connect(_DB_PATH)
+_c = _conn.cursor()
+
 print("Loading clanbattle data.")
 _CB_ID, _DB_START_DATE, _DB_END_DATE = _c.execute(
-    "SELECT clan_battle_id, start_time, end_time from clan_battle_period"
+    "SELECT clan_battle_id, start_time, end_time from clan_battle_period where clan_battle_id=1054"
 ).fetchall()[-1]
 _CB_TIER_THRESHOLD = _get_tier_treshold(_CB_ID)
 _CB_BOSSES = _get_bosses_data(_CB_ID, _CB_TIER_THRESHOLD)
