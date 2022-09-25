@@ -16,7 +16,9 @@ class ModCommands(commands.Cog, name="Mod Commands"):  # type: ignore
             ctx.message.channel.guild.id, ctx.message.channel.id
         )
         if ctx.clan:
-            if ctx.author.get_role(ctx.clan.config.CLAN_MOD_ROLE_ID):
+            if any(
+                ctx.author.get_role(role) for role in ctx.clan.config.CLAN_MOD_ROLE_IDS
+            ):
                 return True
             if not ctx.message.content.startswith(f"{self.bot.command_prefix}help"):
                 await command_error_respond(ctx, ErrorMessage.NOT_MOD)
