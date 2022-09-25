@@ -4,7 +4,7 @@ import time
 import discord
 
 from nozomi_cb_bot.cb import Boss
-from nozomi_cb_bot.config import TIER_COLOUR, jst_time
+from nozomi_cb_bot.config import TIER_COLOURS, jst_time
 
 
 class BossEmbed(discord.Embed):
@@ -15,7 +15,7 @@ class BossEmbed(discord.Embed):
         self.description = self._boss_description()
         self.set_image(url=boss.img_url)
         self._set_boss_footer()
-        self.colour = discord.Colour.from_rgb(*TIER_COLOUR[self._boss.tier - 1])
+        self.colour = discord.Colour.from_rgb(*TIER_COLOURS[self._boss.tier - 1])
 
     def _boss_title(self) -> str:
         title = f"Boss {self._boss.number} : {self._boss.name}"

@@ -179,7 +179,7 @@ else:
         tzinfo=tz
     )
 
-CB_DATA = PricoCbData(
+CB_DATA: PricoCbData = PricoCbData(
     CB_ID=_CB_ID,
     TIER_THRESHOLD=_CB_TIER_THRESHOLD,
     START_DATE=_CB_START_DATE,
@@ -187,7 +187,7 @@ CB_DATA = PricoCbData(
     BOSSES_DATA=_CB_BOSSES,
 )
 
-TIER_COLOUR = [
+TIER_COLOURS: list[tuple[int, int, int]] = [
     (132, 189, 107),
     (112, 166, 225),
     (200, 109, 167),
