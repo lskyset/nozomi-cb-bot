@@ -62,7 +62,7 @@ class ClanConfig:
     GUILD_ID: int
     CHANNEL_ID: int
     CLAN_ROLE_ID: int
-    CLAN_MOD_ROLE_ID: int
+    CLAN_MOD_ROLE_IDS: list[int]
     CLAN_ENV: int = BotConfig.DEFAULT_BOT_ENV
     timeout_minutes: int = 15
     skip_line: int = 0
@@ -162,7 +162,7 @@ _c = _conn.cursor()
 
 print("Loading clanbattle data.")
 _CB_ID, _DB_START_DATE, _DB_END_DATE = _c.execute(
-    "SELECT clan_battle_id, start_time, end_time from clan_battle_period where clan_battle_id=1054"
+    "SELECT clan_battle_id, start_time, end_time from clan_battle_period where clan_battle_id=1055"
 ).fetchall()[-1]
 _CB_TIER_THRESHOLD = _get_tier_treshold(_CB_ID)
 _CB_BOSSES = _get_bosses_data(_CB_ID, _CB_TIER_THRESHOLD)
