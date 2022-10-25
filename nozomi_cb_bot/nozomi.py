@@ -1,3 +1,5 @@
+from typing import cast
+
 import discord
 from discord.ext import commands
 
@@ -29,20 +31,23 @@ class Nozomi(commands.Bot):
         for clan in self.clan_manager.clans:
             if not (channel := self.get_channel(clan.config.CHANNEL_ID)):
                 continue
-            clan.init_members(channel.guild.get_role(clan.config.CLAN_ROLE_ID).members)
-            clan.is_daily_reset = False
+            channel = cast(discord.TextChannel, channel)
+            if clan_role := channel.guild.get_role(clan.config.CLAN_ROLE_ID):
+                clan.init_members(clan_role.members)
         await self.start_uis()
         number_of_clans = len(self.clan_manager.clans)
         print(f"{number_of_clans} Clan{'s' * (number_of_clans > 1)} loaded.")
-        # MY_GUILD = discord.Object(id=)
-        # self.tree.copy_global_to(guild=MY_GUILD)
-        # await self.tree.sync(guild=MY_GUILD)
+
+        if self.config.APP_COMMAND_GUILD_ID:
+            guild = discord.Object(id=self.config.APP_COMMAND_GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
 
     async def setup_hook(self) -> None:
         await self.load_commands()
         self.clan_manager.load_clans_from_config()
 
-    async def on_message(self, message) -> None:
+    async def on_message(self, message: discord.Message) -> None:
         if not (message.channel and message.channel.guild):
             return
         clan = self.clan_manager.find_clan_by_id(
@@ -72,8 +77,9 @@ class Nozomi(commands.Bot):
     async def load_commands(self) -> None:
         print("Loading commands.")
         await self.load_extension("nozomi_cb_bot.commands.global_commands")
+        # await self.load_extension("nozomi_cb_bot.commands.cb_app_commands")
         await self.load_extension("nozomi_cb_bot.commands.cb_commands")
-        await self.load_extension("nozomi_cb_bot.commands.cb_app_commands")
+        await self.load_extension("nozomi_cb_bot.commands.mod_app_commands")
         await self.load_extension("nozomi_cb_bot.commands.mod_commands")
 
     async def start_uis(self) -> None:
@@ -81,6 +87,7 @@ class Nozomi(commands.Bot):
         for clan in self.clan_manager.clans:
             if not (channel := self.get_channel(clan.config.CHANNEL_ID)):
                 continue
+            channel = cast(discord.TextChannel, channel)
             await discord_ui.start_ui(self, channel, clan)
 
     def run(self):

@@ -81,12 +81,12 @@ class SqliteDatabase:
         boss_data = self._get_boss_data(message.id)
         if boss_data is None:
             return None
-        return cb.Boss(  # type: ignore
+        return cb.Boss(
             *boss_data,
-            self._cb_data,
-            self,
-            clan,
-            message,
+            self._cb_data,  # type: ignore
+            self,  # type: ignore
+            clan,  # type: ignore
+            message,  # type: ignore
         )
 
     def get_all_bosses(self, clan: cb.Clan) -> list[cb.Boss] | None:
@@ -94,16 +94,16 @@ class SqliteDatabase:
         if not bosses_data:
             return None
         return [
-            cb.Boss(  # type: ignore
+            cb.Boss(
                 *boss_data,
-                self._cb_data,
-                self,
-                clan,
+                self._cb_data,  # type: ignore
+                self,  # type: ignore
+                clan,  # type: ignore
             )
             for boss_data in bosses_data
         ]
 
-    def _save_boss(self, boss: cb.Boss, save: bool) -> None:
+    def _update_boss(self, boss: cb.Boss, save: bool) -> None:
         self._c.execute(
             """UPDATE boss_data SET
                     wave = ?,
@@ -125,11 +125,11 @@ class SqliteDatabase:
             self._save()
 
     def save_boss(self, boss: cb.Boss) -> None:
-        return self._save_boss(boss, save=True)
+        return self._update_boss(boss, save=True)
 
     def save_bosses(self, bosses: list[cb.Boss]) -> None:
         for boss in bosses:
-            self._save_boss(boss, save=False)
+            self._update_boss(boss, save=False)
         self._save()
 
     def _add_member(
@@ -191,12 +191,12 @@ class SqliteDatabase:
         member_data = self._get_member_data(member.id)
         if member_data is None:
             return None
-        return cb.Member(  # type: ignore
+        return cb.Member(
             *member_data,
-            self._cb_data,
-            self,
-            clan,
-            member,
+            self._cb_data,  # type: ignore
+            self,  # type: ignore
+            clan,  # type: ignore
+            member,  # type: ignore
         )
 
     def get_members(
@@ -208,7 +208,7 @@ class SqliteDatabase:
                 ret.append(clan_member)
         return ret
 
-    def save_member(self, member: cb.Member) -> None:
+    def _update_member(self, member: cb.Member, save: bool) -> None:
         self._c.execute(
             """UPDATE members_data SET
                     name = ?,
@@ -240,11 +240,19 @@ class SqliteDatabase:
                 member.discord_id,
             ),
         )
-        self._save()
+        if save:
+            self._save()
+
+    def update_member(self, member: cb.Member) -> None:
+        self._update_member(member, save=False)
+
+    def save_member(self, member: cb.Member) -> None:
+        self._update_member(member, save=True)
 
     def save_members(self, members: list[cb.Member]) -> None:
         for member in members:
-            self.save_member(member)
+            self._update_member(member, save=False)
+        self._save()
 
     def _save(self) -> None:
         self._conn.commit()
@@ -338,3 +346,7 @@ class SqliteDatabase:
                     d5_missed_of int)"""
         )
         self._save()
+
+    def close(self) -> None:
+        self._save()
+        self._conn.close()

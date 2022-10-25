@@ -1,7 +1,7 @@
 import discord
 
 from nozomi_cb_bot.cb import Clan
-from nozomi_cb_bot.config import TIER_COLOUR
+from nozomi_cb_bot.config import TIER_COLOURS
 
 
 class OverviewEmbed(discord.Embed):
@@ -14,7 +14,7 @@ class OverviewEmbed(discord.Embed):
             name="Clan info",
             value=f"**Hits done :** {len(self._clan.members) * 3 - self._clan.hits_left} / {len(self._clan.members) * 3}",
         )
-        self.colour = discord.Colour.from_rgb(*TIER_COLOUR[self._clan.tier - 1])
+        self.colour = discord.Colour.from_rgb(*TIER_COLOURS[self._clan.tier - 1])
 
     def _add_boss_fileds(self):
         for boss in self._clan.bosses:

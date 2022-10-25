@@ -45,3 +45,6 @@ class CbDatabase(Protocol):
 
     def save_members(self, members: list[cb.Member]) -> None:
         ...
+
+    def close(self) -> None:
+        ...

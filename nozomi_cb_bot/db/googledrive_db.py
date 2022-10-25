@@ -114,3 +114,7 @@ class GoogleDriveDatabase:
         self._upload()
         self._ui._update()
         self._loading = False
+
+    def close(self) -> None:
+        self._save()
+        self._conn.close()

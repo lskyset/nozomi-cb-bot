@@ -85,7 +85,9 @@ class Clan:
             boss._save()
         self._save()
 
-    def hitting(self, member: cb.Member, boss: cb.Boss, *args) -> ErrorMessage | None:
+    def hitting(
+        self, member: cb.Member, boss: cb.Boss, *args
+    ) -> ErrorMessage | NoticeMessage:
         if boss.wave - self.wave > 1 or boss.tier != self.tier:
             return ErrorMessage.BOSS_WAVE_AHEAD
         if member.hitting_boss_number:
@@ -103,14 +105,15 @@ class Clan:
         boss.queue_timeout = None
         member._save()
         boss._save()
-        return None
+        return NoticeMessage.EMPTY
 
     def syncing(
         self, member: cb.Member, sync_member: cb.Member, boss, *args
-    ) -> ErrorMessage | NoticeMessage | None:
+    ) -> ErrorMessage | NoticeMessage:
         if not member.hitting_boss_number:
-            if error := self.hitting(member, boss, *args):
-                return error
+            result = self.hitting(member, boss, *args)
+            if isinstance(result, ErrorMessage):
+                return result
         if sync_member.hitting_boss_number:
             return ErrorMessage.SYNC_ALREADY_HITTING
         if boss.syncing_member_id is not None:

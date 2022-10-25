@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from nozomi_cb_bot.nozomi import Nozomi
+from nozomi_cb_bot.utils.command_utils import proxy_command
 
 
 class CbAppCommands(commands.Cog, name="CB App Commands"):  # type: ignore
@@ -26,7 +27,7 @@ class CbAppCommands(commands.Cog, name="CB App Commands"):  # type: ignore
         async def hit(
             interaction: discord.Interaction, boss_number: app_commands.Choice[int]
         ):
-            print(interaction, boss_number)
+            await proxy_command(interaction, f"!h b{boss_number.value}")
 
         @bot.tree.command()
         @app_commands.rename(boss_number="boss")
@@ -43,7 +44,7 @@ class CbAppCommands(commands.Cog, name="CB App Commands"):  # type: ignore
         async def queue(
             interaction: discord.Interaction, boss_number: app_commands.Choice[int]
         ):
-            print(interaction, boss_number)
+            await proxy_command(interaction, f"!q b{boss_number.value}")
 
 
 async def setup(bot: Nozomi):

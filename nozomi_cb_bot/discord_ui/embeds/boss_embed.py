@@ -1,10 +1,9 @@
-import datetime
 import time
 
 import discord
 
 from nozomi_cb_bot.cb import Boss
-from nozomi_cb_bot.config import TIER_COLOUR, jst_time
+from nozomi_cb_bot.config import TIER_COLOURS, jst_time
 
 
 class BossEmbed(discord.Embed):
@@ -15,7 +14,7 @@ class BossEmbed(discord.Embed):
         self.description = self._boss_description()
         self.set_image(url=boss.img_url)
         self._set_boss_footer()
-        self.colour = discord.Colour.from_rgb(*TIER_COLOUR[self._boss.tier - 1])
+        self.colour = discord.Colour.from_rgb(*TIER_COLOURS[self._boss.tier - 1])
 
     def _boss_title(self) -> str:
         title = f"Boss {self._boss.number} : {self._boss.name}"
@@ -72,17 +71,8 @@ class BossEmbed(discord.Embed):
                             ),
                         )
                     if self._boss.clan.timeout_minutes == 0:
-                        time_text += time.strftime(
-                            "[%H:%M:%S]",
-                            time.gmtime(
-                                (
-                                    datetime.datetime.now()
-                                    - datetime.datetime.fromtimestamp(
-                                        member_data["timestamp"]
-                                    )
-                                ).seconds
-                            ),
-                        )
+                        time_text += f'[<t:{member_data["timestamp"]}:R>]'
+
                     queue_text += f"-{time_text} {member.name} {note_text} {' (OF)' * member.of_status}\n"
             if waiting_queue:
                 for member_data in waiting_queue:
