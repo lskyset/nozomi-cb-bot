@@ -43,7 +43,6 @@ class BotConfig:
     DEFAULT_BOT_ENV: int = int(os.getenv("DEFAULT_BOT_ENV") or 0)
     BOT_ENV: int = int(os.getenv("BOT_ENV") or 0)
     DISCORD_TOKEN: str | None = os.getenv("DISCORD_TOKEN")
-    APP_COMMAND_GUILD_ID: int = int(os.getenv("APP_COMMAND_GUILD_ID") or 0)
 
 
 @dataclass(frozen=True)

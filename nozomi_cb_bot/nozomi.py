@@ -35,13 +35,9 @@ class Nozomi(commands.Bot):
             if clan_role := channel.guild.get_role(clan.config.CLAN_ROLE_ID):
                 clan.init_members(clan_role.members)
         await self.start_uis()
+        await self.tree.sync()
         number_of_clans = len(self.clan_manager.clans)
         print(f"{number_of_clans} Clan{'s' * (number_of_clans > 1)} loaded.")
-
-        if self.config.APP_COMMAND_GUILD_ID:
-            guild = discord.Object(id=self.config.APP_COMMAND_GUILD_ID)
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
 
     async def setup_hook(self) -> None:
         await self.load_commands()
