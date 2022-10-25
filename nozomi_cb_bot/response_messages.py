@@ -1,6 +1,7 @@
 from enum import Enum
 
-from discord.ext import commands
+from nozomi_cb_bot import emoji
+from nozomi_cb_bot.utils.command_utils import NozoContext
 
 
 class ErrorMessage(Enum):
@@ -52,39 +53,43 @@ class NoticeMessage(Enum):
     EMPTY = ""
 
 
-def get_success_message(ctx: commands.Context, response: ResponseMessage) -> str:
+def get_success_message(ctx: NozoContext, response: ResponseMessage) -> str:
     return response.value.format(ctx)
 
 
-def get_error_message(ctx: commands.Context, error: ErrorMessage) -> str:
+def get_error_message(ctx: NozoContext, error: ErrorMessage) -> str:
     return error.value.format(ctx)
 
 
-def get_help_message(ctx: commands.Context, help_message: HelpMessage) -> str:
+def get_help_message(ctx: NozoContext, help_message: HelpMessage) -> str:
     return help_message.value.format(ctx)
 
 
-def get_notice_message(ctx: commands.context, notice: NoticeMessage) -> str:
+def get_notice_message(ctx: NozoContext, notice: NoticeMessage) -> str:
     return notice.value.format(ctx)
 
 
-async def bot_respond(ctx: commands.Context, content: str | None = None) -> None:
+async def bot_respond(
+    ctx: NozoContext, content: str | None = None, emoji: bool = False
+) -> None:
     if ctx.message.interaction is not None:
-        if ctx.edit_original_response:
-            return await ctx.message.interaction.edit_original_response(
+        if getattr(ctx, "edit_original_response", None):
+            return await ctx.message.interaction.edit_original_response(  # type: ignore
                 content=content, view=ctx.new_view
             )
         else:
             kwargs = {"content": content, "ephemeral": True}
-            if ctx.new_view:
+            if getattr(ctx, "new_view", None):
                 kwargs["view"] = ctx.new_view
-            return await ctx.message.interaction.followup.send(**kwargs)
+            return await ctx.message.interaction.followup.send(**kwargs)  # type: ignore
     else:
-        return await ctx.reply(content=content, delete_after=7)
+        if emoji and content:
+            return await ctx.message.add_reaction(content)
+        await ctx.reply(content=content, delete_after=7)
 
 
 async def command_error_respond(
-    ctx: commands.Context,
+    ctx: NozoContext,
     error: ErrorMessage,
     help_message: HelpMessage = HelpMessage.EMPTY,
 ) -> None:
@@ -93,9 +98,13 @@ async def command_error_respond(
 
 
 async def command_success_respond(
-    ctx: commands.Context,
+    ctx: NozoContext,
     response_message: ResponseMessage,
     notice: NoticeMessage = NoticeMessage.EMPTY,
 ) -> None:
     content = f"{get_success_message(ctx, response_message)}\n{get_notice_message(ctx, notice)}"
     await bot_respond(ctx, content=content)
+
+
+async def command_success_respond_emoji(ctx: NozoContext) -> None:
+    await bot_respond(ctx, content=emoji.ok, emoji=True)

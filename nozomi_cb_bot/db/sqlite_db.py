@@ -81,12 +81,12 @@ class SqliteDatabase:
         boss_data = self._get_boss_data(message.id)
         if boss_data is None:
             return None
-        return cb.Boss(  # type: ignore
+        return cb.Boss(
             *boss_data,
-            self._cb_data,
-            self,
-            clan,
-            message,
+            self._cb_data,  # type: ignore
+            self,  # type: ignore
+            clan,  # type: ignore
+            message,  # type: ignore
         )
 
     def get_all_bosses(self, clan: cb.Clan) -> list[cb.Boss] | None:
@@ -94,11 +94,11 @@ class SqliteDatabase:
         if not bosses_data:
             return None
         return [
-            cb.Boss(  # type: ignore
+            cb.Boss(
                 *boss_data,
-                self._cb_data,
-                self,
-                clan,
+                self._cb_data,  # type: ignore
+                self,  # type: ignore
+                clan,  # type: ignore
             )
             for boss_data in bosses_data
         ]
@@ -191,12 +191,12 @@ class SqliteDatabase:
         member_data = self._get_member_data(member.id)
         if member_data is None:
             return None
-        return cb.Member(  # type: ignore
+        return cb.Member(
             *member_data,
-            self._cb_data,
-            self,
-            clan,
-            member,
+            self._cb_data,  # type: ignore
+            self,  # type: ignore
+            clan,  # type: ignore
+            member,  # type: ignore
         )
 
     def get_members(
@@ -346,3 +346,7 @@ class SqliteDatabase:
                     d5_missed_of int)"""
         )
         self._save()
+
+    def close(self) -> None:
+        self._save()
+        self._conn.close()

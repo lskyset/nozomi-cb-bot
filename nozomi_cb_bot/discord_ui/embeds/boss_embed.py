@@ -1,4 +1,3 @@
-import datetime
 import time
 
 import discord
@@ -72,17 +71,8 @@ class BossEmbed(discord.Embed):
                             ),
                         )
                     if self._boss.clan.timeout_minutes == 0:
-                        time_text += time.strftime(
-                            "[%H:%M:%S]",
-                            time.gmtime(
-                                (
-                                    datetime.datetime.now()
-                                    - datetime.datetime.fromtimestamp(
-                                        member_data["timestamp"]
-                                    )
-                                ).seconds
-                            ),
-                        )
+                        time_text += f'[<t:{member_data["timestamp"]}:R>]'
+
                     queue_text += f"-{time_text} {member.name} {note_text} {' (OF)' * member.of_status}\n"
             if waiting_queue:
                 for member_data in waiting_queue:

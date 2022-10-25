@@ -19,7 +19,8 @@ class GspreadUi:
     ) -> None:
         self._config = gspread_config
         self._c = db_c
-        self._gs_sheet = GC.open_by_key(self._config.SHEET_KEY)
+        if GC is not None:
+            self._gs_sheet = GC.open_by_key(self._config.SHEET_KEY)
         self._gs_data = self._gs_sheet.worksheet(self._config.DATA_WORKSHEET_NAME)
         self._gs_chat_log = self._gs_sheet.worksheet(
             self._config.CHAT_LOG_WORKSHEET_NAME

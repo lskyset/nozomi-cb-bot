@@ -28,7 +28,7 @@ def connect_to_drive() -> tuple[gspread.Client, GoogleDrive] | tuple[None, None]
 
     GoogleAuth.DEFAULT_SETTINGS["client_config_file"] = "./volume/client_secrets.json"
     creds = ServiceAccountCredentials.from_json_keyfile_name(
-        f"./volume/{json_creds}", scope
+        f"./volume/{json_creds}", scope  # type: ignore
     )
     gc = gspread.authorize(creds)
     gauth = GoogleAuth()
@@ -43,6 +43,7 @@ class BotConfig:
     DEFAULT_BOT_ENV: int = int(os.getenv("DEFAULT_BOT_ENV") or 0)
     BOT_ENV: int = int(os.getenv("BOT_ENV") or 0)
     DISCORD_TOKEN: str | None = os.getenv("DISCORD_TOKEN")
+    APP_COMMAND_GUILD_ID: int = int(os.getenv("APP_COMMAND_GUILD_ID") or 0)
 
 
 @dataclass(frozen=True)
@@ -148,7 +149,23 @@ def jst_time(minutes: int = 0, seconds: int = 0) -> datetime:
     return jst_now + timedelta(minutes=minutes, seconds=seconds)
 
 
-GC: gspread.Client
+def _get_closest_cb_id() -> int:
+    tz = pytz.timezone("Japan")
+    now = jst_time()
+    cb_schedules = _c.execute(
+        "SELECT clan_battle_id, start_time from clan_battle_period"
+    ).fetchall()
+    return min(
+        cb_schedules,
+        key=lambda x: abs(
+            (
+                datetime.strptime(x[1], "%Y/%m/%d %H:%M:%S").replace(tzinfo=tz) - now
+            ).total_seconds()
+        ),
+    )[0]
+
+
+GC: gspread.Client | None
 Drive: GoogleDrive
 GC, DRIVE = connect_to_drive()
 
@@ -161,8 +178,9 @@ _conn = sqlite3.connect(_DB_PATH)
 _c = _conn.cursor()
 
 print("Loading clanbattle data.")
-_CB_ID, _DB_START_DATE, _DB_END_DATE = _c.execute(
-    "SELECT clan_battle_id, start_time, end_time from clan_battle_period where clan_battle_id=1055"
+_CB_ID = _get_closest_cb_id()
+_DB_START_DATE, _DB_END_DATE = _c.execute(
+    f"SELECT start_time, end_time from clan_battle_period where clan_battle_id={_CB_ID}"
 ).fetchall()[-1]
 _CB_TIER_THRESHOLD = _get_tier_treshold(_CB_ID)
 _CB_BOSSES = _get_bosses_data(_CB_ID, _CB_TIER_THRESHOLD)
