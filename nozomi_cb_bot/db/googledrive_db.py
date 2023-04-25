@@ -1,5 +1,4 @@
 import os
-import time
 
 import discord
 
@@ -13,8 +12,6 @@ class GoogleDriveDatabase:
     def __init__(self, clan_config: ClanConfig, cb_data: PricoCbData) -> None:
         self._clan_config = clan_config
         self._cb_data = cb_data
-
-        self._loading = False
 
         self._db_path = f"volume/{clan_config.name}.db"
 
@@ -108,12 +105,8 @@ class GoogleDriveDatabase:
                 file.Upload()
 
     def _save(self) -> None:
-        while self._loading:
-            time.sleep(1)
-        self._loading = True
         self._upload()
         self._ui._update()
-        self._loading = False
 
     def close(self) -> None:
         self._save()
