@@ -1,8 +1,15 @@
 from discord.ext import commands
 
 from nozomi_cb_bot import emoji
+from nozomi_cb_bot.discord_ui import discord_ui
 from nozomi_cb_bot.nozomi import Nozomi
-from nozomi_cb_bot.response_messages import ErrorMessage, command_error_respond
+from nozomi_cb_bot.response_messages import (
+    ErrorMessage,
+    HelpMessage,
+    ResponseMessage,
+    command_error_respond,
+    command_success_respond,
+)
 from nozomi_cb_bot.utils.command_utils import NozoContext
 
 
@@ -65,6 +72,29 @@ class ModCommands(commands.Cog, name="Mod Commands"):  # type: ignore
         ctx.message.author = member
         ctx.message.content = " ".join(args[1:])
         await self.bot.process_commands(ctx.message)
+
+    @commands.command()
+    async def edit(self, ctx: NozoContext, *args):
+        args = tuple(map(str.lower, args))
+        if not args:
+            return await command_error_respond(
+                ctx, ErrorMessage.NO_ARGS, HelpMessage.EMPTY
+            )
+        ctx.boss = None
+        for boss in ctx.clan.bosses:
+            if f"b{boss.number}" in args[0]:
+                ctx.boss = boss
+        if ctx.boss is None:
+            return await command_error_respond(
+                ctx, ErrorMessage.NO_BOSS, HelpMessage.EMPTY
+            )
+        hp, wave, *_ = args[2:]
+        ctx.boss._hp = int(hp)
+        ctx.boss._wave = int(wave)
+        ctx.boss._save()
+        await discord_ui.update_ui(ctx.clan)
+
+        return await command_success_respond(ctx, ResponseMessage.DONE)
 
 
 def daily_reset(clans):

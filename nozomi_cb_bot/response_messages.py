@@ -34,6 +34,7 @@ class ResponseMessage(Enum):
     HIT = "You are now hitting B{0.boss.number}."
     CANCEL = "You are no longer hitting B{0.boss.number}."
     DONE = "Your damage has been registered."
+    EDIT = "{0.boss.number} has been edited."
 
 
 class HelpMessage(Enum):
