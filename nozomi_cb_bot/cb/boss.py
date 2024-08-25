@@ -72,8 +72,11 @@ class Boss:
 
     @property
     def tier(self) -> int:
-        return 1 + self._cb_data.TIER_THRESHOLD.index(
-            max([i for i in self._cb_data.TIER_THRESHOLD if self._wave >= i])
+        return max(
+            2,
+            self._cb_data.TIER_THRESHOLD.index(
+                max([i for i in self._cb_data.TIER_THRESHOLD if self._wave >= i])
+            ),
         )
 
     @property
