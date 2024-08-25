@@ -98,12 +98,12 @@ class PricoCbData:
 
 def _get_tier_treshold(cb_id: int) -> list[int]:
     data = _c.execute(
-        f"SELECT phase from clan_battle_2_map_data where clan_battle_id={cb_id}"
+        f"SELECT phase from clan_battle_2_map_data where clan_battle_id={cb_id-1}"
     ).fetchall()
     tier_threshold: list[int] = []
     for (tier,) in set(data):
         (threshold,) = _c.execute(
-            f"SELECT lap_num_from from clan_battle_2_map_data where clan_battle_id={cb_id} and phase={tier}"
+            f"SELECT lap_num_from from clan_battle_2_map_data where clan_battle_id={cb_id-1} and phase={tier}"
         ).fetchall()[0]
         tier_threshold.append(threshold)
     tier_threshold.sort()
@@ -121,7 +121,7 @@ def _get_bosses_data(cb_id: int, tier_threshold: list[int]) -> list[BossData]:
             boss_id = _c.execute(
                 f"SELECT enemy_id_1 from wave_group_data where wave_group_id = {wave_id}"
             ).fetchone()[0]
-            if phase == 1:
+            if phase == -2:
                 unit_id, name, max_hp = _c.execute(
                     f"SELECT unit_id, name, hp from enemy_parameter where enemy_id = {boss_id}"
                 ).fetchone()
