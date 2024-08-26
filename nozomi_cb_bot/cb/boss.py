@@ -85,7 +85,7 @@ class Boss:
 
     @property
     def max_hp(self) -> int:
-        return self._cb_data.BOSSES_DATA[self._number - 1].MAX_HP_LIST[self.tier - 1]
+        return self._cb_data.BOSSES_DATA[self._number - 1].MAX_HP_LIST[self.tier]
 
     @property
     def img_url(self) -> str:
