@@ -114,7 +114,7 @@ def _get_bosses_data(cb_id: int, tier_threshold: list[int]) -> list[BossData]:
     boss_list: list[BossData] = []
     for lap_num in tier_threshold:
         phase, *tier_data = _c.execute(
-            f"SELECT difficulty, wave_group_id_1, wave_group_id_2, wave_group_id_3, wave_group_id_4, wave_group_id_5  from clan_battle_2_map_data where clan_battle_id={cb_id} and lap_num_from={lap_num}"
+            f"SELECT phase, wave_group_id_1, wave_group_id_2, wave_group_id_3, wave_group_id_4, wave_group_id_5  from clan_battle_2_map_data where clan_battle_id={cb_id} and lap_num_from={lap_num}"
         ).fetchone()
         boss_num = 1
         for wave_id in tier_data:
