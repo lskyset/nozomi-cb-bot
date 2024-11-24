@@ -121,7 +121,7 @@ def _get_bosses_data(cb_id: int, tier_threshold: list[int]) -> list[BossData]:
             boss_id = _c.execute(
                 f"SELECT enemy_id_1 from wave_group_data where wave_group_id = {wave_id}"
             ).fetchone()[0]
-            if phase == -2:
+            if phase == 1:
                 unit_id, name, max_hp = _c.execute(
                     f"SELECT unit_id, name, hp from enemy_parameter where enemy_id = {boss_id}"
                 ).fetchone()
